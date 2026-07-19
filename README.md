@@ -6,6 +6,9 @@ the browser's native `CompressionStream`/`DecompressionStream` for .docx ZIP
 handling, and hand-written OOXML (WordprocessingML) mapping. The backend is a
 single dependency-free Node server (HTTP + hand-rolled RFC 6455 WebSocket).
 
+Demo: https://doc.mochi-flow.com
+
+
 ## Quick start
 
 ```bash
