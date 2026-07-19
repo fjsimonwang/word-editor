@@ -90,7 +90,15 @@
     .links-row .col a:hover { text-decoration: underline; }
     .links-row .col .plain { font-size: 13px; color: var(--muted); display: block; padding: 3px 0; }
 
-    footer { text-align: center; padding: 20px 0 32px; font-size: 12px; color: var(--muted); }
+    footer { padding: 20px 40px 28px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); background: var(--surface); }
+footer .foot-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+footer .foot-left { color: var(--muted); }
+footer .foot-right { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+footer .foot-gh { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); text-decoration: none; transition: all .15s; font-weight: 500; }
+footer .foot-gh:hover { border-color: var(--accent); color: var(--accent); }
+footer .foot-gh svg { fill: currentColor; }
+footer .foot-star { font-size: 11px; padding: 1px 6px; background: #fff8e1; color: #b8860b; border-radius: 10px; min-width: 18px; text-align: center; }
+footer .foot-meta code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; padding: 4px 8px; background: #eef1f6; border-radius: 4px; color: var(--text); }
   </style>
 </head>
 <body>
@@ -101,7 +109,7 @@
     <a href="/editor.html">Editor</a>
     <a href="/embed-demo.html">Embed demo</a>
     <a href="/api-docs.html">API docs</a>
-    <a href="https://github.com/your-org/word-editor" target="_blank">GitHub</a>
+    <a href="https://github.com/fjsimonwang/word-editor" target="_blank">GitHub</a>
     <a href="/editor.html" class="btn-open">Open editor →</a>
   </div>
 </div>
@@ -119,6 +127,7 @@
       <a class="primary" href="#demo">Try the demo ↓</a>
       <a class="secondary" href="/editor.html">Open standalone editor</a>
       <a class="secondary" href="/js/sdk.js">Download SDK</a>
+      <a class="secondary" href="https://github.com/fjsimonwang/word-editor" target="_blank">★ Star on GitHub</a>
     </div>
   </div>
 
@@ -194,7 +203,7 @@
     </div>
     <div class="col">
       <h4>Deployment</h4>
-      <a href="https://github.com/your-org/word-editor" target="_blank">GitHub repository</a>
+      <a href="https://github.com/fjsimonwang/word-editor" target="_blank">GitHub repository</a>
       <span class="plain">Docker: <code>docker compose up -d</code></span>
     </div>
     <div class="col">
@@ -207,7 +216,21 @@
 </div>
 
 <footer>
-  WordEditor — built with vanilla JavaScript, zero dependencies
+  <div class="foot-inner">
+    <div class="foot-left">
+      WordEditor — built with vanilla JavaScript, zero dependencies
+    </div>
+    <div class="foot-right">
+      <a href="https://github.com/fjsimonwang/word-editor" target="_blank" class="foot-gh">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span class="foot-gh-text">View on GitHub</span>
+        <span class="foot-star" id="gh-stars">★</span>
+      </a>
+      <span class="foot-meta">
+        <code>git clone https://github.com/fjsimonwang/word-editor.git</code>
+      </span>
+    </div>
+  </div>
 </footer>
 
 <script src="/js/sdk.js"></script>
@@ -240,6 +263,18 @@
       resEl.textContent = JSON.stringify(m, null, 2);
     });
   }
+
+  // Live GitHub star count (public repo — no auth needed)
+  fetch("https://api.github.com/repos/fjsimonwang/word-editor")
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var el = document.getElementById("gh-stars");
+      if (el && typeof d.stargazers_count === "number") {
+        var n = d.stargazers_count;
+        el.textContent = "★ " + (n >= 1000 ? (n / 1000).toFixed(1) + "k" : n);
+      }
+    })
+    .catch(function () { /* leave default ★ */ });
 </script>
 </body>
 </html>
