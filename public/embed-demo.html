@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WordEditor SDK — Embed API demo</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    /* Demo page chrome — the iframe is a *small* framed app inside the host page,
+       and the controls sit outside the iframe in the host's "parent" UI. */
+    body { font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--ink); margin: 0; }
+    .host { display: flex; height: 100vh; }
+    .host-side { width: 340px; flex: none; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+    .host-side header { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .host-side header h1 { font-size: 16px; margin: 0; }
+    .host-side header p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+    .host-scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px; }
+    .host-frame { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 16px; gap: 12px; min-height: 0; }
+    .host-frame .bar { display: flex; align-items: center; gap: 10px; }
+    .host-frame .bar .title { font-weight: 600; font-size: 14px; }
+    .host-frame .bar .meta { color: var(--muted); font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
+    #editor-holder { flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,0.12); overflow: hidden; background: #fff; }
+    #editor-holder iframe { width: 100%; height: 100%; border: none; display: block; }
+    .group { margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .group > h2 { margin: 0; padding: 6px 10px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: #eef1f6; border-bottom: 1px solid var(--border); }
+    .group > div { padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+    button, .btn, select, input[type="text"], input[type="number"] {
+      font: 12px/1.3 inherit; color: var(--ink); border: 1px solid var(--border);
+      background: #fff; border-radius: 5px; padding: 4px 8px; cursor: pointer; }
+    button:hover { background: #eef1f6; }
+    button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    button.primary:hover { background: #1f4490; }
+    .field { display: inline-flex; align-items: center; gap: 4px; }
+    .field span { font-size: 11px; color: var(--muted); }
+    .status-pill { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #e9eef5; color: var(--muted); }
+    .status-pill.live { background: #d9f5e2; color: #1a7f37; }
+    code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: #eef1f6; padding: 1px 4px; border-radius: 3px; }
+    .kvlist { font-size: 12px; }
+    .kvlist .row { display: flex; justify-content: space-between; padding: 2px 0; gap: 8px; }
+    .kvlist .row span:last-child { font-family: ui-monospace, Menlo, monospace; color: var(--muted); text-align: right; word-break: break-all; }
+    @media (max-width: 900px) {
+      .host { flex-direction: column; height: auto; }
+      .host-side { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+      #editor-holder { height: 60vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="host">
+    <!-- Left: the host application's controls (OUTSIDE the iframe) -->
+    <aside class="host-side">
+      <header>
+        <h1>Host app — controls</h1>
+        <p>Drives the embedded WordEditor via the JS SDK and postMessage API.</p>
+      </header>
+      <div class="host-scroll">
+
+        <section class="group">
+          <h2>Document</h2>
+          <div>
+            <button class="primary" onclick="act('getContent')">↩ Get content</button>
+            <button onclick="act('getText')">↩ Plain text</button>
+            <button onclick="act('getMeta')">↩ Meta</button>
+            <button onclick="act('save')">💾 Save</button>
+            <button onclick="act('newDocument')">＋ New</button>
+            <button onclick="act('listDocuments')">↩ List docs</button>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Insert</h2>
+          <div>
+            <button onclick="demo.insertText()">Insert text</button>
+            <button onclick="demo.insertHtml()">Insert paragraph</button>
+            <button onclick="demo.insertLink()">Insert link</button>
+            <button onclick="demo.insertImage()">Insert image</button>
+            <button onclick="demo.insertTable()">Insert table</button>
+            <button onclick="act('insertPageBreak')">Page break</button>
+            <button onclick="act('insertBlankPage')">Blank page</button>
+            <button onclick="act('insertHr')">Horizontal line</button>
+            <div class="field" style="width:100%">
+              <span>Symbol</span>
+              <input type="text" id="sym" width="3" size="3" maxlength="2" value="§">
+              <button onclick="demo.insertSymbol()">Insert</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Formatting</h2>
+          <div>
+            <button onclick="act('bold')"><b>B</b></button>
+            <button onclick="act('italic')"><i>I</i></button>
+            <button onclick="act('underline')"><u>U</u></button>
+            <button onclick="act('strikeThrough')"><s>S</s></button>
+            <button onclick="act('formatBlock','H1')">H1</button>
+            <button onclick="act('formatBlock','H2')">H2</button>
+            <button onclick="act('formatBlock','P')">P</button>
+            <button onclick="act('insertUnorderedList')">• List</button>
+            <button onclick="act('insertOrderedList')">1. List</button>
+            <button onclick="act('justifyLeft')">⬅</button>
+            <button onclick="act('justifyCenter')">⬌</button>
+            <button onclick="act('justifyRight')">➡</button>
+            <button onclick="act('indent')">Indent</button>
+            <button onclick="act('outdent')">Outdent</button>
+            <div class="field" style="width:100%">
+              <span>Color</span>
+              <input type="color" id="fg" value="#c0392b" style="width:24px;height:24px;padding:0;border:none">
+              <button onclick="demo.foreColor()">Apply</button>
+              <input type="color" id="bg" value="#fff2a8" style="width:24px;height:24px;padding:0;border:none">
+              <button onclick="demo.hiliteColor()">Highlight</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Page setup</h2>
+          <div>
+            <div class="field">
+              <span>Size</span>
+              <select id="ps-size">
+                <option value="Letter">Letter</option>
+                <option value="A4">A4</option>
+                <option value="Legal">Legal</option>
+                <option value="A3">A3</option>
+              </select>
+            </div>
+            <div class="field">
+              <span>Orient.</span>
+              <select id="ps-orient">
+                <option value="portrait">portrait</option>
+                <option value="landscape">landscape</option>
+              </select>
+            </div>
+            <div class="field">
+              <span>Top</span>
+              <input type="number" id="ps-mt" min="0.2" max="5" step="0.1" value="1">
+              <span>in</span>
+            </div>
+            <div class="field">
+              <span>Left</span>
+              <input type="number" id="ps-ml" min="0.2" max="5" step="0.1" value="1">
+              <span>in</span>
+            </div>
+            <button class="primary" onclick="demo.applyPageSetup()">Apply</button>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Headers / footers / page numbers</h2>
+          <div>
+            <div class="field" style="width:100%">
+              <span>Header</span>
+              <input type="text" id="hdr-text" placeholder="(blank = clear)" size="14">
+              <select id="hdr-align">
+                <option value="left">L</option>
+                <option value="center" selected>C</option>
+                <option value="right">R</option>
+              </select>
+              <button onclick="demo.setHeader()">Set</button>
+            </div>
+            <div class="field" style="width:100%">
+              <span>Footer</span>
+              <input type="text" id="ftr-text" placeholder="(blank = clear)" size="14">
+              <select id="ftr-align">
+                <option value="left">L</option>
+                <option value="center" selected>C</option>
+                <option value="right">R</option>
+              </select>
+              <button onclick="demo.setFooter()">Set</button>
+            </div>
+            <div class="field" style="width:100%">
+              <span>Page #</span>
+              <select id="pn-fmt">
+                <option value="arabic">1, 2, 3</option>
+                <option value="roman">i, ii, iii</option>
+                <option value="alpha">a, b, c</option>
+                <option value="page">Page 1</option>
+                <option value="pageOfN">Page 1 of N</option>
+              </select>
+              <select id="pn-place">
+                <option value="footer-center">bottom C</option>
+                <option value="footer-left">bottom L</option>
+                <option value="footer-right">bottom R</option>
+                <option value="header-right">top R</option>
+              </select>
+              <button onclick="demo.setPageNumbers()">On</button>
+              <button onclick="editor.setPageNumbers({enabled:false}); log('pageNumbers off')">Off</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Zoom</h2>
+          <div>
+            <button onclick="editor.setZoom(0.75);log('setZoom 0.75')">75%</button>
+            <button onclick="editor.setZoom(1);log('setZoom 1')">100%</button>
+            <button onclick="editor.setZoom(1.25);log('setZoom 1.25')">125%</button>
+            <button onclick="editor.setZoom(1.5);log('setZoom 1.5')">150%</button>
+            <button onclick="act('getZoom')">↩ read</button>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Comments &amp; review</h2>
+          <div>
+            <div class="field" style="width:100%">
+              <input type="text" id="cmt-text" placeholder="Comment…" size="18">
+              <button onclick="demo.addComment()">Add on selection</button>
+            </div>
+            <button onclick="act('getComments')">↩ List comments</button>
+            <label class="field"><input type="checkbox" id="tc-toggle"> Track changes</label>
+            <button onclick="demo.toggleTrack()">Apply</button>
+            <button onclick="act('getChanges')">↩ List changes</button>
+            <button onclick="act('acceptAllChanges')">Accept all</button>
+            <button onclick="act('rejectAllChanges')">Reject all</button>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Find / replace</h2>
+          <div>
+            <div class="field" style="width:100%">
+              <input type="text" id="find-q" placeholder="Query" size="12">
+              <button onclick="demo.find()">Find</button>
+            </div>
+            <div class="field" style="width:100%">
+              <input type="text" id="find-repl" placeholder="Replacement" size="12">
+              <button onclick="demo.replaceAll()">Replace all</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Versions</h2>
+          <div>
+            <button onclick="act('listVersions')">↩ List versions</button>
+            <div class="field">
+              <span>Index</span>
+              <input type="number" id="v-idx" min="0" value="0" style="width:48px">
+              <button onclick="demo.restoreVersion()">Restore</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="group">
+          <h2>Mode &amp; export</h2>
+          <div>
+            <button onclick="act('setMode','edit')">Edit</button>
+            <button onclick="act('setMode','view')">View</button>
+            <button onclick="act('undo')">↩ Undo</button>
+            <button onclick="act('redo')">↩ Redo</button>
+            <button onclick="demo.exportDoc('html')">.html</button>
+            <button onclick="demo.exportDoc('txt')">.txt</button>
+            <button onclick="demo.exportDoc('docx')">.docx</button>
+            <button onclick="demo.exportDoc('pdf')">PDF (print)</button>
+          </div>
+        </section>
+
+      </div>
+    </aside>
+
+    <!-- Right: the embed is constrained to a small framed area inside the host page -->
+    <main class="host-frame">
+      <div class="bar">
+        <span class="title">Embedded WordEditor</span>
+        <span class="status-pill" id="ready-state">not ready</span>
+        <span class="meta" id="doc-state">—</span>
+        <span style="flex:1"></span>
+        <span class="meta">iframe → /?embed=1&amp;toolbar=1&amp;statusbar=1&amp;user=Host-Demo</span>
+      </div>
+
+      <div id="editor-holder"></div>
+
+    </main>
+  </div>
+
+  <script src="/js/sdk.js"></script>
+  <script>
+    const log = (...a) => console.log(...a);
+    const val = (id) => document.getElementById(id).value;
+
+    const editor = WordEditor.init({
+      container: "#editor-holder",
+      user: "Host-Demo",
+      onReady: (i) => { log("ready:", i); document.getElementById("ready-state").textContent = "ready"; document.getElementById("ready-state").classList.add("live"); },
+      onChange: (i) => log("change:", i),
+      onSave: (i) => { log("save:", i); document.getElementById("doc-state").textContent = `rev ${i.rev} · ${i.title}`; },
+      onPresence: (p) => log("presence:", p.users.map(u => u.user)),
+      onError: (e) => log("error:", e),
+    });
+
+    // Generic
+    window.act = async (cmd, args) => {
+      try {
+        if (args === undefined) return log(cmd, "→", await editor[cmd]());
+        if (typeof args !== "object") { args = { value: args }; return log(cmd, "→", await editor[cmd](args.value)); }
+        return log(cmd, "→", await editor[cmd](args));
+      } catch (e) { log("err:", cmd, e.message); }
+    };
+
+    window.demo = {
+      insertText: () => editor.insertText("Hello at " + new Date().toLocaleTimeString()),
+      insertHtml: () => editor.insertHtml("<p><b>Inserted</b> via SDK at " + new Date().toLocaleTimeString() + "</p>"),
+      insertLink: () => editor.insertLink("https://opencode.ai", "opencode.ai"),
+      insertImage: () => editor.insertImage("https://picsum.photos/seed/sdk/" + Math.floor(Math.random()*999) + "/360/200", { alt: "random", width: 360, height: 200 }),
+      insertTable: () => editor.insertTable(3, 4),
+      insertSymbol: () => editor.insertSymbol(val("sym")),
+
+      foreColor: () => editor.foreColor(val("fg")),
+      hiliteColor: () => editor.hiliteColor(val("bg")),
+
+      applyPageSetup: () => editor.setPageSetup({
+        size: val("ps-size"),
+        orientation: val("ps-orient"),
+        margins: { top: parseFloat(val("ps-mt")), left: parseFloat(val("ps-ml")) },
+      }),
+      setHeader: () => editor.setHeader(val("hdr-text"), val("hdr-align")),
+      setFooter: () => editor.setFooter(val("ftr-text"), val("ftr-align")),
+      setPageNumbers: () => editor.setPageNumbers({ format: val("pn-fmt"), place: val("pn-place") }),
+
+      addComment: () => editor.addComment(val("cmt-text"), "Host-Demo"),
+      toggleTrack: () => editor.setTrackChanges(document.getElementById("tc-toggle").checked),
+
+      find: () => editor.find(val("find-q")),
+      replaceAll: () => editor.replaceAll(val("find-q"), val("find-repl")),
+
+      restoreVersion: () => editor.restoreVersion(parseInt(val("v-idx"), 10)),
+
+      exportDoc: (fmt) => editor.exportDoc(fmt),
+    };
+  </script>
+</body>
+</html>

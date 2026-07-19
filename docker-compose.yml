@@ -1,0 +1,13 @@
+services:
+  word-editor:
+    build: .
+    image: word-editor
+    container_name: word-editor
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - word-editor-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  word-editor-data:

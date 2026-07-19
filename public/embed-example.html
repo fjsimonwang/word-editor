@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WordEditor SDK — embed example</title>
+  <style>
+    body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 24px; background: #eef0f4; }
+    h1 { font-size: 18px; }
+    #holder { height: 70vh; border: 1px solid #ccc; border-radius: 8px; overflow: hidden; background: #fff; }
+    #controls { margin: 12px 0; display: flex; gap: 8px; flex-wrap: wrap; }
+    button { padding: 6px 14px; cursor: pointer; }
+    #log { font: 12px/1.5 monospace; background: #1e2430; color: #9fe8a2; padding: 10px; border-radius: 6px; height: 120px; overflow: auto; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>WordEditor SDK — embed example</h1>
+  <div id="controls">
+    <button onclick="demo.insert()">Insert text</button>
+    <button onclick="demo.getContent()">Get content</button>
+    <button onclick="demo.setTitle()">Set title</button>
+    <button onclick="demo.save()">Save</button>
+    <button onclick="demo.viewMode()">View mode</button>
+    <button onclick="demo.editMode()">Edit mode</button>
+  </div>
+  <div id="holder"></div>
+  <div id="log"></div>
+
+  <script src="/js/sdk.js"></script>
+  <script>
+    const logEl = document.getElementById("log");
+    const log = (...a) => { logEl.textContent += a.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(" ") + "\n"; logEl.scrollTop = 1e9; };
+
+    const editor = WordEditor.init({
+      container: "#holder",
+      user: "SDK-Demo",
+      onReady: (i) => log("ready:", i),
+      onChange: (i) => log("change:", i),
+      onSave: (i) => log("save:", i),
+      onPresence: (p) => log("presence:", p.users.map(u => u.user)),
+    });
+
+    window.demo = {
+      insert: () => editor.insertHtml("<p>Inserted at <b>" + new Date().toLocaleTimeString() + "</b></p>"),
+      getContent: async () => log("content:", (await editor.getContent()).html.slice(0, 200)),
+      setTitle: () => editor.setTitle("SDK Demo Document"),
+      save: async () => log("saved:", await editor.save()),
+      viewMode: () => editor.setMode("view"),
+      editMode: () => editor.setMode("edit"),
+    };
+  </script>
+</body>
+</html>

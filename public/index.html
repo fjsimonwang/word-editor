@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WordEditor — Online Document Editor</title>
+  <script>
+    if (new URLSearchParams(location.search).get("embed") === "1") {
+      location.replace("/editor.html" + location.search);
+    }
+  </script>
+  <style>
+    :root {
+      --accent: #2b579a;
+      --accent-hover: #1f4490;
+      --bg: #f0f2f5;
+      --surface: #ffffff;
+      --border: #e0e3e8;
+      --text: #1f2430;
+      --muted: #6b7280;
+      --radius: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-lg: 0 4px 24px rgba(0,0,0,0.10);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+
+    .page { max-width: 1100px; margin: 0 auto; padding: 0 40px; }
+
+    /* ─── header bar ─── */
+    .header { display: flex; align-items: center; padding: 0 40px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .header .logo { font-weight: 700; font-size: 16px; color: var(--accent); letter-spacing: -0.3px; }
+    .header .nav { display: flex; align-items: center; gap: 24px; margin-left: auto; }
+    .header .nav a { font-size: 13px; color: var(--muted); text-decoration: none; transition: color .15s; }
+    .header .nav a:hover { color: var(--accent); }
+    .header .nav .btn-open { font-size: 13px; padding: 6px 16px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); text-decoration: none; transition: background .15s; }
+    .header .nav .btn-open:hover { background: #eef1f6; }
+
+    /* ─── hero ─── */
+    .hero { text-align: center; padding: 64px 0 12px; }
+    .hero h1 { font-size: 36px; font-weight: 700; margin: 0 0 12px; letter-spacing: -0.5px; }
+    .hero p { font-size: 16px; line-height: 1.7; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
+    .hero .actions { display: flex; gap: 10px; justify-content: center; }
+    .hero .actions a { font-size: 14px; padding: 10px 24px; border-radius: 8px; text-decoration: none; font-weight: 500; transition: all .15s; }
+    .hero .actions .primary { background: var(--accent); color: #fff; }
+    .hero .actions .primary:hover { background: var(--accent-hover); }
+    .hero .actions .secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); box-shadow: var(--shadow); }
+    .hero .actions .secondary:hover { border-color: #c0c4cc; }
+
+    /* ─── demo frame ─── */
+    .demo { padding: 32px 0 8px; }
+    .demo .frame { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-lg); overflow: hidden; }
+    .demo .frame .bar { display: flex; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); gap: 10px; }
+    .demo .frame .bar .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .demo .frame .bar .dot.r { background: #ff5f57; }
+    .demo .frame .bar .dot.y { background: #ffbd2e; }
+    .demo .frame .bar .dot.g { background: #28c840; }
+    .demo .frame .bar .label { font-size: 12px; color: var(--muted); margin-left: 6px; }
+    .demo .frame .body { height: 68vh; min-height: 460px; position: relative; }
+    .demo .frame .body iframe { width: 100%; height: 100%; border: none; display: block; }
+
+    /* ─── demo tabs ─── */
+    .demo-tabs { display: flex; gap: 4px; margin-top: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; }
+    .demo-tabs a { font-size: 13px; padding: 7px 18px; color: var(--muted); text-decoration: none; border-radius: 6px; transition: all .15s; cursor: pointer; }
+    .demo-tabs a:hover { color: var(--text); }
+    .demo-tabs a.active { background: var(--accent); color: #fff; }
+
+    /* ─── api actions panel ─── */
+    .api-panel { margin-top: 16px; }
+    .api-panel .section-label { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .api-panel .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .api-panel .row button { font: 13px/1.4 inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px; cursor: pointer; transition: all .12s; }
+    .api-panel .row button:hover { border-color: var(--accent); color: var(--accent); }
+    .api-panel .row button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .api-panel .row button.primary:hover { background: var(--accent-hover); }
+    .api-panel .divider { height: 1px; background: var(--border); margin: 12px 0; }
+    .api-panel .result { font: 13px/1.6 ui-monospace, Menlo, monospace; background: #1a1f2e; color: #b7e0b7; padding: 12px 16px; border-radius: 8px; min-height: 28px; max-height: 90px; overflow: auto; margin-top: 8px; }
+
+    /* ─── features ─── */
+    .features { padding: 48px 0 40px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .features .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 20px; box-shadow: var(--shadow); }
+    .features .card h3 { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+    .features .card p { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.6; }
+
+    /* ─── links ─── */
+    .links-row { padding: 28px 0 40px; display: flex; gap: 48px; border-top: 1px solid var(--border); }
+    .links-row .col { }
+    .links-row .col h4 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin: 0 0 10px; }
+    .links-row .col a { display: block; font-size: 13px; color: var(--accent); text-decoration: none; padding: 3px 0; }
+    .links-row .col a:hover { text-decoration: underline; }
+    .links-row .col .plain { font-size: 13px; color: var(--muted); display: block; padding: 3px 0; }
+
+    footer { text-align: center; padding: 20px 0 32px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">WordEditor</div>
+  <div class="nav">
+    <a href="/editor.html">Editor</a>
+    <a href="/embed-demo.html">Embed demo</a>
+    <a href="/api-docs.html">API docs</a>
+    <a href="https://github.com/your-org/word-editor" target="_blank">GitHub</a>
+    <a href="/editor.html" class="btn-open">Open editor →</a>
+  </div>
+</div>
+
+<div class="page">
+
+  <div class="hero">
+    <h1>Word-Compatible Editor</h1>
+    <p>
+      A full-featured rich-text editor that runs entirely in the browser — .docx
+      import/export, real-time collaboration, track changes, comments, page layout,
+      version history, and an embed SDK with REST API. Zero server dependencies.
+    </p>
+    <div class="actions">
+      <a class="primary" href="#demo">Try the demo ↓</a>
+      <a class="secondary" href="/editor.html">Open standalone editor</a>
+      <a class="secondary" href="/js/sdk.js">Download SDK</a>
+    </div>
+  </div>
+
+  <div class="demo" id="demo">
+    <div class="frame">
+      <div class="bar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="label">WordEditor — /</span>
+        <span style="flex:1"></span>
+        <span id="frame-status" style="font-size:11px;color:var(--muted)">connecting…</span>
+      </div>
+      <div class="body" id="frame-body"></div>
+    </div>
+
+    <div class="demo-tabs">
+      <a class="active" onclick="return switchTab(this,'live')">Live editor</a>
+      <a onclick="return switchTab(this,'api')">API actions</a>
+    </div>
+
+    <div class="api-panel" id="api-panel" style="display:none">
+      <div class="section-label">Drive the editor from here</div>
+      <div class="row">
+        <button onclick="ed.insertHtml('<p>Inserted at <b>'+new Date().toLocaleTimeString()+'</b></p>')">Insert paragraph</button>
+        <button onclick="ed.bold()"><b>B</b></button>
+        <button onclick="ed.italic()"><i>I</i></button>
+        <button onclick="ed.underline()"><u>U</u></button>
+        <button onclick="ed.justifyCenter()">Center</button>
+        <button onclick="ed.insertOrderedList()">Numbered list</button>
+        <button onclick="ed.insertUnorderedList()">Bullet list</button>
+        <button onclick="ed.insertLink('https://opencode.ai', 'opencode.ai')">Insert link</button>
+        <button onclick="ed.insertTable(3,4)">3×4 table</button>
+        <button onclick="ed.insertPageBreak()">Page break</button>
+        <button onclick="ed.insertHr()">Horizontal line</button>
+        <button onclick="ed.setHeader('Draft','center')">Header</button>
+        <button onclick="ed.setPageNumbers({format:'page',place:'footer-center'})">Page numbers</button>
+        <button onclick="ed.setZoom(1.25)">Zoom 125%</button>
+        <button onclick="getContent()">Get content</button>
+        <button onclick="getMeta()">Get meta</button>
+        <button onclick="ed.exportDoc('docx')" class="primary">Export .docx</button>
+        <button onclick="ed.exportDoc('pdf')" class="primary">Export PDF</button>
+      </div>
+      <div class="result" id="api-result">Click any button → the SDK sends a postMessage command to the embedded editor.</div>
+    </div>
+  </div>
+
+  <div class="features">
+    <div class="card"><h3>📄 .docx import/export</h3><p>Open and save native Word documents without any server-side conversion. Round-trips formatting, comments, and page setup.</p></div>
+    <div class="card"><h3>👥 Real-time collaboration</h3><p>WebSocket-based presence and document sync. Multiple users can edit the same document simultaneously.</p></div>
+    <div class="card"><h3>📝 Track changes</h3><p>Full revision tracking — insertions and deletions are recorded. Accept or reject individual changes.</p></div>
+    <div class="card"><h3>💬 Comments</h3><p>Anchor comments to specific text selections. Reply threads, resolve, and delete. Persisted across sessions.</p></div>
+    <div class="card"><h3>📐 Page layout</h3><p>Margins, page size (Letter / A4 / Legal / A3), orientation, headers, footers, and page numbers.</p></div>
+    <div class="card"><h3>📚 Version history</h3><p>Automatic snapshots on every save. Browse and restore any previous version with one click.</p></div>
+    <div class="card"><h3>🔍 Find &amp; replace</h3><p>Search document text with optional regex and case matching. Replace individual or all occurrences.</p></div>
+    <div class="card"><h3>🎨 Rich formatting</h3><p>Bold, italic, underline, strikethrough, subscript, superscript, font family, size, color, highlight, alignment, indent.</p></div>
+    <div class="card"><h3>🖼 Images, tables, shapes</h3><p>Insert inline images, WordArt, shapes, tables, hyperlinks, symbols, page breaks, horizontal rules.</p></div>
+    <div class="card"><h3>🔌 Embed SDK</h3><p>Mount the editor in any page with <code>&lt;script src="sdk.js"&gt;</code>. Full postMessage API — 50+ commands.</p></div>
+    <div class="card"><h3>🌐 REST API</h3><p>All document operations available as HTTP endpoints. Use the <code>WordEditorRestClient</code> from any language.</p></div>
+    <div class="card"><h3>⚡ Single binary</h3><p>Zero-dependency Node.js server. No npm install, no database — just <code>node server.js</code> and it runs.</p></div>
+  </div>
+
+  <div class="links-row">
+    <div class="col">
+      <h4>API reference</h4>
+      <a href="/api-docs.html">Swagger — REST API</a>
+      <a href="/api-docs.html#sdk">SDK commands</a>
+      <a href="/js/sdk.js">sdk.js (download)</a>
+      <a href="/js/api-client.js">api-client.js</a>
+    </div>
+    <div class="col">
+      <h4>Demos</h4>
+      <a href="/embed-demo.html">Demo with host controls</a>
+      <a href="/editor.html">Standalone editor</a>
+    </div>
+    <div class="col">
+      <h4>Deployment</h4>
+      <a href="https://github.com/your-org/word-editor" target="_blank">GitHub repository</a>
+      <span class="plain">Docker: <code>docker compose up -d</code></span>
+    </div>
+    <div class="col">
+      <h4>Server</h4>
+      <a href="/api/health">Health check</a>
+      <span class="plain">Node.js · port 3001</span>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  WordEditor — built with vanilla JavaScript, zero dependencies
+</footer>
+
+<script src="/js/sdk.js"></script>
+<script>
+  var resEl = document.getElementById("api-result");
+  var statusEl = document.getElementById("frame-status");
+
+  var ed = WordEditor.init({
+    container: "#frame-body",
+    user: "Demo",
+    onReady: function (i) { statusEl.textContent = "ready · doc " + i.id.slice(0,8); },
+    onChange: function () {},
+    onError: function (e) { statusEl.textContent = "error"; console.error(e); },
+  });
+
+  function switchTab(el, tab) {
+    document.getElementById("api-panel").style.display = tab === "api" ? "block" : "none";
+    document.querySelectorAll(".demo-tabs a").forEach(function (a) { a.classList.remove("active"); });
+    el.classList.add("active");
+    return false;
+  }
+
+  function getContent() {
+    ed.getContent().then(function (c) {
+      resEl.textContent = (c.html || "").slice(0, 200);
+    });
+  }
+  function getMeta() {
+    ed.getMeta().then(function (m) {
+      resEl.textContent = JSON.stringify(m, null, 2);
+    });
+  }
+</script>
+</body>
+</html>

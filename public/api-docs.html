@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WordEditor — API reference</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; background: #f5f6f8; }
+    .sdk-hero { margin: 16px 32px; padding: 20px 24px; background: #fff; border: 1px solid #d8dbe2; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .sdk-hero h2 { margin: 0 0 4px; font-size: 18px; }
+    .sdk-hero p { margin: 0 0 8px; color: #555; font-size: 14px; }
+    .sdk-hero code { font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #eef1f6; padding: 1px 5px; border-radius: 3px; }
+    .sdk-hero .example { background: #1e2430; color: #b9e0b9; padding: 12px 16px; border-radius: 6px; font: 12px/1.6 ui-monospace, Menlo, monospace; overflow-x: auto; margin: 8px 0 0; }
+    table.cmds { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.cmds th, table.cmds td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #d8dbe2; vertical-align: top; }
+    table.cmds th { background: #eef1f6; font-weight: 600; position: sticky; top: 0; }
+    table.cmds td:first-child { font-family: ui-monospace, Menlo, monospace; white-space: nowrap; }
+    table.cmds td:nth-child(2) { font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+    .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 8px; font-weight: 600; }
+    .badge.sdk { background: #dbe6f5; color: #1c3a6b; }
+    .badge.rest { background: #d9f5e2; color: #1a7f37; }
+    .badge.get { background: #d0ebff; color: #1864ab; }
+    .badge.put { background: #ffd8a8; color: #a15800; }
+    .badge.post { background: #d3f9d8; color: #2b8a3e; }
+    .badge.del { background: #ffe3e3; color: #c0392b; }
+    .tagline { display: flex; gap: 13px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+    .tagline a { font-size: 13px; color: #2b579a; text-decoration: none; font-weight: 600; }
+    .tagline a:hover { text-decoration: underline; }
+    .api-grid { display: flex; gap: 24px; margin: 16px 32px; align-items: flex-start; }
+    .api-grid > div { flex: 1; min-width: 0; }
+    .sdk-panel { background: #fff; border: 1px solid #d8dbe2; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; display: flex; flex-direction: column; max-height: calc(100vh - 60px); }
+    .sdk-panel h2 { margin: 0; padding: 14px 18px; font-size: 15px; background: #f0f3f8; border-bottom: 1px solid #d8dbe2; }
+    .sdk-panel .scroll { overflow: auto; flex: 1; }
+    .sdk-panel table { font-size: 13px; }
+    .sdk-panel table th { position: sticky; top: 0; z-index: 2; }
+    .sep { color: #bbb; padding: 0 4px; }
+    .menu-bar { display: flex; align-items: center; gap: 16px; padding: 12px 32px; background: #1e2430; color: #fff; }
+    .menu-bar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+    .menu-bar a { color: #8ab4ff; text-decoration: none; font-size: 13px; }
+    .menu-bar a:hover { text-decoration: underline; }
+    .menu-bar .tabs { display: flex; gap: 8px; margin-left: auto; }
+    .menu-bar .tabs a { color: #ccc; padding: 4px 12px; border-radius: 4px; font-size: 13px; }
+    .menu-bar .tabs a.active { color: #fff; background: #2b579a; }
+    .swagger-wrap { padding: 0 10px; }
+    @media (max-width: 900px) {
+      .api-grid { flex-direction: column; margin: 12px; }
+      .sdk-hero { margin: 12px; }
+      .menu-bar { flex-wrap: wrap; padding: 10px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="menu-bar">
+    <h1>WordEditor API reference</h1>
+    <div class="tabs">
+      <a href="#" class="active" onclick="showTab('rest')">REST API (Swagger)</a>
+      <a href="#" onclick="showTab('sdk')">SDK commands</a>
+      <a href="#" onclick="showTab('restclient')">REST client</a>
+    </div>
+  </div>
+
+<div id="sdk-panel" style="display:none">
+  <div class="sdk-hero">
+    <h2>Embed WordEditor via iframe + JS SDK</h2>
+    <p>
+      The <code>WordEditor</code> SDK creates an iframe hosting the editor in another
+      origin (or same-origin) and exposes every editor action over
+      <code>window.postMessage</code>.  Include
+      <code>&lt;script src=&quot;http://editor-host/js/sdk.js&quot;&gt;&lt;/script&gt;</code>
+      then call <code>WordEditor.init()</code>.
+    </p>
+    <div class="example">
+// ─── bootstrap ───
+const ed = WordEditor.init({
+  container: "#editor-holder",  // CSS selector or Element
+  baseUrl: "http://localhost:3001",
+  user: "Alice",
+  onReady(info)  { console.log("ready", info); },
+  onChange(info) { console.log("change", info); },
+});
+
+// ─── all SDK methods return Promises ───
+const meta  = await ed.getMeta();
+const html  = (await ed.getContent()).html;
+await ed.setContent("&lt;p&gt;Hello&lt;/p&gt;");
+await ed.bold(); await ed.justifyCenter();
+await ed.insertImage("https://picsum.photos/360/200", { width:360, height:200 });
+await ed.exportDoc("docx");
+await ed.setPageSetup({ size:"A4", margins: { top:1, left:1 } });
+const docs   = await ed.listDocuments();
+await ed.newDocument("Memo");
+await ed.addComment("Review this paragraph");
+ed.destroy();
+    </div>
+  </div>
+
+  <div class="api-grid">
+    <div class="sdk-panel">
+      <h2>Content / meta</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Returns</th><th>postMessage cmd</th></tr></thead>
+          <tbody>
+            <tr><td>getContent</td><td>—</td><td><code>{html}</code></td><td>getContent</td></tr>
+            <tr><td>getText</td><td>—</td><td><code>{text}</code></td><td>getText</td></tr>
+            <tr><td>setContent</td><td><code>html</code></td><td><code>{ok:true}</code></td><td>setContent</td></tr>
+            <tr><td>insertText</td><td><code>text</code></td><td><code>{ok:true}</code></td><td>insertText</td></tr>
+            <tr><td>insertHtml</td><td><code>html</code></td><td><code>{ok:true}</code></td><td>insertHtml</td></tr>
+            <tr><td>getMeta</td><td>—</td><td><code>{id,title,rev,words,chars,pageSetup,trackChanges,commentCount}</code></td><td>getMeta</td></tr>
+            <tr><td>setTitle</td><td><code>title</code></td><td><code>{ok:true}</code></td><td>setTitle</td></tr>
+            <tr><td>save</td><td>—</td><td><code>{ok:true, rev}</code></td><td>save</td></tr>
+            <tr><td>focus</td><td>—</td><td><code>{ok:true}</code></td><td>focus</td></tr>
+            <tr><td>getSelectedText</td><td>—</td><td><code>{text, html}</code></td><td>getSelectedText</td></tr>
+            <tr><td>undo</td><td>—</td><td><code>{ok, canUndo, canRedo}</code></td><td>undo</td></tr>
+            <tr><td>redo</td><td>—</td><td><code>{ok, canUndo, canRedo}</code></td><td>redo</td></tr>
+            <tr><td>canUndo</td><td>—</td><td><code>{canUndo, canRedo}</code></td><td>canUndo</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Formatting (execCommand)</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>postMessage call</th></tr></thead>
+          <tbody>
+            <tr><td>bold</td><td>format {cmd:bold}</td></tr>
+            <tr><td>italic</td><td>format {cmd:italic}</td></tr>
+            <tr><td>underline</td><td>format {cmd:underline}</td></tr>
+            <tr><td>strikeThrough</td><td>format {cmd:strikeThrough}</td></tr>
+            <tr><td>subscript</td><td>format {cmd:subscript}</td></tr>
+            <tr><td>superscript</td><td>format {cmd:superscript}</td></tr>
+            <tr><td>justifyLeft</td><td>format {cmd:justifyLeft}</td></tr>
+            <tr><td>justifyCenter</td><td>format {cmd:justifyCenter}</td></tr>
+            <tr><td>justifyRight</td><td>format {cmd:justifyRight}</td></tr>
+            <tr><td>justifyFull</td><td>format {cmd:justifyFull}</td></tr>
+            <tr><td>insertOrderedList</td><td>format {cmd:insertOrderedList}</td></tr>
+            <tr><td>insertUnorderedList</td><td>format {cmd:insertUnorderedList}</td></tr>
+            <tr><td>outdent</td><td>format {cmd:outdent}</td></tr>
+            <tr><td>indent</td><td>format {cmd:indent}</td></tr>
+            <tr><td>formatBlock(tag)</td><td>format {cmd:formatBlock, value:tag}</td></tr>
+            <tr><td>foreColor(color)</td><td>format {cmd:foreColor, value:color}</td></tr>
+            <tr><td>hiliteColor(color)</td><td>format {cmd:hiliteColor, value:color}</td></tr>
+            <tr><td>fontName(font)</td><td>format {cmd:fontName, value:font}</td></tr>
+            <tr><td>fontSize(size)</td><td>format {cmd:fontSize, value:size}</td></tr>
+            <tr><td>format(cmd, value)</td><td>format {cmd, value}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Insert content</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Returns</th><th>postMessage cmd</th></tr></thead>
+          <tbody>
+            <tr><td>insertImage</td><td><code>src, {alt, width, height}</code></td><td><code>{ok:true}</code></td><td>insertImage</td></tr>
+            <tr><td>insertLink</td><td><code>href, text</code></td><td><code>{ok:true}</code></td><td>insertLink</td></tr>
+            <tr><td>insertTable</td><td><code>rows, cols</code></td><td><code>{ok:true}</code></td><td>insertTable</td></tr>
+            <tr><td>insertSymbol</td><td><code>char</code></td><td><code>{ok:true}</code></td><td>insertSymbol</td></tr>
+            <tr><td>insertPageBreak</td><td>—</td><td><code>{ok:true}</code></td><td>insertPageBreak</td></tr>
+            <tr><td>insertBlankPage</td><td>—</td><td><code>{ok:true}</code></td><td>insertBlankPage</td></tr>
+            <tr><td>insertHr</td><td>—</td><td><code>{ok:true}</code></td><td>insertHr</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Headers / footers / page numbers</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td>setHeader</td><td><code>text, align</code></td><td><code>{ok:true}</code></td></tr>
+            <tr><td>setFooter</td><td><code>text, align</code></td><td><code>{ok:true}</code></td></tr>
+            <tr><td>setPageNumbers</td><td><code>{enabled, format, place}</code></td><td><code>{ok:true}</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Page setup / zoom</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td>setPageSetup</td><td><code>{size, orientation, margins:{top,bottom,left,right}}</code></td><td><code>{ok, pageSetup}</code></td></tr>
+            <tr><td>getPageSetup</td><td>—</td><td><code>{pageSetup}</code></td></tr>
+            <tr><td>setZoom</td><td><code>zoom (number)</code></td><td><code>{ok, zoom}</code></td></tr>
+            <tr><td>getZoom</td><td>—</td><td><code>{zoom}</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Document management</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td>loadDocument</td><td><code>id</code></td><td><code>{ok}</code></td></tr>
+            <tr><td>setMode</td><td><code>"edit" | "view"</code></td><td><code>{ok:true}</code></td></tr>
+            <tr><td>listDocuments</td><td>—</td><td><code>{documents[]}</code></td></tr>
+            <tr><td>newDocument</td><td><code>title</code></td><td><code>{ok, id}</code></td></tr>
+            <tr><td>deleteDocument</td><td><code>id</code></td><td><code>{ok}</code></td></tr>
+            <tr><td>listVersions</td><td>—</td><td><code>{versions[]}</code></td></tr>
+            <tr><td>restoreVersion</td><td><code>index</code></td><td><code>{ok, rev}</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Find / replace</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td>find</td><td><code>query, {matchCase?, regex?}</code></td><td><code>{matches}</code></td></tr>
+            <tr><td>replaceAll</td><td><code>query, replacement, {matchCase?, regex?}</code></td><td><code>{replaced}</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Review / comments</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Returns</th></tr></thead>
+          <tbody>
+            <tr><td>addComment</td><td><code>text, author?</code></td><td><code>{id}</code></td></tr>
+            <tr><td>getComments</td><td>—</td><td><code>{comments[]}</code></td></tr>
+            <tr><td>setTrackChanges</td><td><code>on (boolean)</code></td><td><code>{ok, on}</code></td></tr>
+            <tr><td>getChanges</td><td>—</td><td><code>{changes[]}</code></td></tr>
+            <tr><td>acceptAllChanges</td><td>—</td><td><code>{ok}</code></td></tr>
+            <tr><td>rejectAllChanges</td><td>—</td><td><code>{ok}</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Export</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>SDK method</th><th>Args</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>exportDoc</td><td><code>"docx"|"html"|"txt"|"pdf"</code></td><td>Triggers a browser download</td></tr>
+            <tr><td>previewPrint</td><td>—</td><td>Opens the browser print dialog</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Lifecycle</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>Method</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>destroy</td><td>Removes the iframe, tears down the message listener, rejects pending calls.</td></tr>
+            <tr><td>iframe</td><td>The underlying &lt;iframe&gt; element (read-only property).</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Init options</h2>
+      <div class="scroll" style="padding:8px 14px; font-size:13px; line-height:1.7;">
+        <table class="cmds">
+          <thead><tr><th>Option</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>container</td><td>string | Element</td><td><i>required</i></td><td>CSS selector or DOM node to mount the iframe</td></tr>
+            <tr><td>baseUrl</td><td>string</td><td>script origin</td><td>Editor server URL</td></tr>
+            <tr><td>docId</td><td>string</td><td>—</td><td>Open a specific document on load</td></tr>
+            <tr><td>mode</td><td><code>"edit"|"view"</code></td><td>edit</td><td>Initial editing mode</td></tr>
+            <tr><td>toolbar</td><td>boolean</td><td>true</td><td>Show the toolbar inside the iframe</td></tr>
+            <tr><td>statusbar</td><td>boolean</td><td>true</td><td>Show the status bar inside the iframe</td></tr>
+            <tr><td>user</td><td>string</td><td>guest</td><td>Display name for presence / authorship</td></tr>
+            <tr><td>onReady</td><td>function</td><td>—</td><td>Fires when the editor finishes loading</td></tr>
+            <tr><td>onChange</td><td>function</td><td>—</td><td>Fires on every content change (throttled)</td></tr>
+            <tr><td>onSave</td><td>function</td><td>—</td><td>Fires when a save round-trip completes</td></tr>
+            <tr><td>onPresence</td><td>function</td><td>—</td><td>Fires on presence updates (users joining/leaving)</td></tr>
+            <tr><td>onError</td><td>function</td><td>—</td><td>Fires on errors</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rest-panel">
+  <div class="swagger-wrap" id="swagger-ui"></div>
+</div>
+
+<div id="rest-client-panel" style="display:none">
+  <div class="sdk-hero">
+    <h2>WordEditorRestClient — use the full API over HTTP</h2>
+    <p>
+      <code>WordEditorRestClient</code> mirrors the embed SDK's method names but talks
+      to the server directly via REST API calls.  No iframe, no postMessage — any
+      HTTP client (curl, Python, Postman) can use these same endpoints.
+    </p>
+    <div class="example">
+// Browser usage
+const api = new WordEditorRestClient("http://localhost:3001");
+
+// Document management
+await api.createDocument("My Document");
+await api.loadDocument(docId);
+const list = await api.listDocuments();
+await api.deleteDocument(docId);
+
+// Content
+const content = await api.getContent();           // {html}
+await api.setContent("&lt;p&gt;Hello&lt;/p&gt;");
+await api.insertHtml("&lt;p&gt;More&lt;/p&gt;");
+await api.insertText("plain text");
+const meta = await api.getMeta();                 // {id, title, rev, words, chars, ...}
+await api.setTitle("New Title");
+
+// Formatting by HTML fragment
+const bold = await api.formatHtml("bold", "text to embolden");  // {ok, html: "&lt;strong&gt;...&lt;/strong&gt;"}
+await api.bold("fragment");
+await api.justifyCenter("&lt;p&gt;centered&lt;/p&gt;");
+
+// Page setup, headers, comments
+await api.setPageSetup({ size: "A4", margins: { top: 1, bottom: 1 } });
+await api.setHeader("Chapter 1", "right");
+await api.addComment("Looks good!", "Alice");
+
+// Export
+await api.exportDoc("docx");   // downloads
+await api.exportDoc("html");
+
+// Versions
+const versions = await api.listVersions();
+await api.restoreVersion(0);
+</div>
+  </div>
+
+  <div class="api-grid">
+    <div class="sdk-panel">
+      <h2>Init &amp; document management</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>Method</th><th>Args</th><th>REST endpoint</th></tr></thead>
+          <tbody>
+            <tr><td>constructor(baseUrl, docId?)</td><td>base URL, optional doc ID</td><td>—</td></tr>
+            <tr><td>createDocument(title)</td><td>title string</td><td><code>POST /api/documents</code></td></tr>
+            <tr><td>loadDocument(id)</td><td>document id</td><td><code>GET /api/documents/{id}</code></td></tr>
+            <tr><td>listDocuments()</td><td>—</td><td><code>GET /api/documents</code></td></tr>
+            <tr><td>deleteDocument(id)</td><td>document id</td><td><code>DELETE /api/documents/{id}</code></td></tr>
+            <tr><td>save()</td><td>—</td><td><code>GET /api/documents/{id}/content</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Content</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>Method</th><th>Args</th><th>REST endpoint</th></tr></thead>
+          <tbody>
+            <tr><td>getContent()</td><td>—</td><td><code>GET /api/documents/{id}/content</code></td></tr>
+            <tr><td>setContent(html)</td><td>HTML string</td><td><code>PUT /api/documents/{id}/content</code></td></tr>
+            <tr><td>getText()</td><td>—</td><td><code>GET /api/documents/{id}/text</code></td></tr>
+            <tr><td>insertHtml(html)</td><td>HTML fragment</td><td><code>POST /api/documents/{id}/insert-html</code></td></tr>
+            <tr><td>insertText(text)</td><td>plain text</td><td><code>POST /api/documents/{id}/insert-text</code></td></tr>
+            <tr><td>getMeta()</td><td>—</td><td><code>GET /api/documents/{id}/meta</code></td></tr>
+            <tr><td>setTitle(title)</td><td>title string</td><td><code>PUT /api/documents/{id}/title</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Formatting (HTML transform)</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>Method</th><th>Args</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>formatHtml(cmd, html, value?)</td><td>command, HTML fragment, optional value</td><td>Apply any format command to the fragment</td></tr>
+            <tr><td>bold(html)</td><td>HTML fragment</td><td>Wraps in <code>&lt;strong&gt;</code></td></tr>
+            <tr><td>italic(html)</td><td>HTML fragment</td><td>Wraps in <code>&lt;em&gt;</code></td></tr>
+            <tr><td>underline(html)</td><td>HTML fragment</td><td>Wraps in <code>&lt;span style="text-decoration:underline"&gt;</code></td></tr>
+            <tr><td>strikeThrough(html)</td><td>HTML fragment</td><td>Wraps in <code>&lt;s&gt;</code></td></tr>
+            <tr><td>foreColor(color, html)</td><td>CSS color, HTML</td><td>Sets foreground color</td></tr>
+            <tr><td>hiliteColor(color, html)</td><td>CSS color, HTML</td><td>Sets background highlight</td></tr>
+            <tr><td>justifyCenter(html)</td><td>HTML fragment</td><td>Wraps in <code>&lt;div style="text-align:center"&gt;</code></td></tr>
+            <tr><td>justifyLeft / justifyRight / justifyFull</td><td>HTML</td><td>Text alignment wrapper</td></tr>
+            <tr><td>insertOrderedList(html)</td><td>newline-separated items</td><td>Wraps in <code>&lt;ol&gt;&lt;li&gt;</code></td></tr>
+            <tr><td>insertUnorderedList(html)</td><td>newline-separated items</td><td>Wraps in <code>&lt;ul&gt;&lt;li&gt;</code></td></tr>
+            <tr><td>formatBlock(tag, html)</td><td>tag name, HTML</td><td>Wraps in <code>&lt;tag&gt;</code></td></tr>
+          </tbody>
+        </table>
+        <div style="padding:8px 12px; font-size:12px; color:var(--muted); border-top:1px solid var(--border);">
+          All formatting methods call <code>POST /api/format</code> with <code>{cmd, html, value}</code>.
+          You provide the exact HTML fragment to format; the server wraps it and returns the result.
+        </div>
+      </div>
+    </div>
+
+    <div class="sdk-panel">
+      <h2>Inserts, page setup, comments</h2>
+      <div class="scroll">
+        <table class="cmds">
+          <thead><tr><th>Method</th><th>REST endpoint</th></tr></thead>
+          <tbody>
+            <tr><td>insertImage(src, opts)</td><td>generates <code>&lt;img&gt;</code> HTML, then calls <code>POST …/insert-html</code></td></tr>
+            <tr><td>insertLink(href, text)</td><td>generates <code>&lt;a&gt;</code> HTML, then calls <code>POST …/insert-html</code></td></tr>
+            <tr><td>insertTable(rows, cols)</td><td>generates table HTML, then calls <code>POST …/insert-html</code></td></tr>
+            <tr><td>insertPageBreak / insertHr / insertBlankPage / insertSymbol</td><td><code>POST …/insert-html</code> or <code>POST …/insert-text</code></td></tr>
+            <tr><td>getPageSetup()</td><td><code>GET /api/documents/{id}/page-setup</code></td></tr>
+            <tr><td>setPageSetup(opts)</td><td><code>PUT /api/documents/{id}/page-setup</code></td></tr>
+            <tr><td>setHeader(text, align)</td><td><code>PUT …/page-setup</code> (modifies chrome.header)</td></tr>
+            <tr><td>setFooter(text, align)</td><td><code>PUT …/page-setup</code> (modifies chrome.footer)</td></tr>
+            <tr><td>setPageNumbers(opts)</td><td><code>PUT …/page-setup</code> (modifies chrome.pageNumber)</td></tr>
+            <tr><td>addComment(text, author?)</td><td><code>POST /api/documents/{id}/comments</code></td></tr>
+            <tr><td>getComments()</td><td><code>GET /api/documents/{id}/comments</code></td></tr>
+            <tr><td>setTrackChanges(on)</td><td><code>PUT /api/documents/{id}/track-changes</code></td></tr>
+            <tr><td>find(query, opts)</td><td>Server-side search in document text</td></tr>
+            <tr><td>replaceAll(query, replacement, opts)</td><td>Server-side search-and-replace in HTML</td></tr>
+            <tr><td>exportDoc(fmt)</td><td><code>GET /api/documents/{id}/export?fmt=xxx</code></td></tr>
+            <tr><td>listVersions()</td><td><code>GET /api/documents/{id}/versions</code></td></tr>
+            <tr><td>restoreVersion(index)</td><td><code>POST /api/documents/{id}/restore</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>
+// ─── OpenAPI 3.0 spec ───
+const spec = {
+  openapi: "3.0.3",
+  info: {
+    title: "WordEditor REST API",
+    version: "1.0.0",
+    description: `\
+RESTful CRUD for documents, version history, and docx binaries.
+The editor data directory is \`data/\`, each document stored as \`<id>.json\`.
+
+---
+
+**Embed SDK** — see the **"SDK commands"** tab for the full postMessage-based SDK surface.
+
+**Server** — Node.js (no dependencies), runs on \`http://localhost:3001\`.
+`,
+  },
+  servers: [{ url: "http://localhost:3001", description: "Development" }],
+  tags: [
+    { name: "Documents", description: "CRUD for document metadata and content" },
+    { name: "Docx", description: "Upload / download binary .docx files" },
+    { name: "Versions", description: "Snapshot history and restore" },
+    { name: "Health", description: "Server liveness" },
+  ],
+  paths: {
+    "/api/health": {
+      get: {
+        tags: ["Health"],
+        summary: "Health check",
+        operationId: "health",
+        responses: {
+          "200": { description: "OK", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, uptime: { type: "number" } } } } } }
+        }
+      }
+    },
+    "/api/documents": {
+      get: {
+        tags: ["Documents"],
+        summary: "List all documents",
+        operationId: "listDocuments",
+        responses: {
+          "200": { description: "Array of document summaries", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/DocumentSummary" } } } } }
+        }
+      },
+      post: {
+        tags: ["Documents"],
+        summary: "Create a new document",
+        operationId: "createDocument",
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { title: { type: "string" }, state: { type: "string" } } } } } },
+        responses: {
+          "200": { description: "Created document", content: { "application/json": { schema: { $ref: "#/components/schemas/Document" } } } }
+        }
+      }
+    },
+    "/api/documents/import": {
+      post: {
+        tags: ["Documents"],
+        summary: "Import a .docx file (base64)",
+        operationId: "importDocument",
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { data: { type: "string", description: "base64-encoded .docx" }, name: { type: "string" } }, required: ["data"] } } } },
+        responses: {
+          "200": { description: "Imported", content: { "application/json": { schema: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, hasDocx: { type: "boolean" } } } } } }
+        }
+      }
+    },
+    "/api/documents/{id}": {
+      get: {
+        tags: ["Documents"],
+        summary: "Get a document",
+        operationId: "getDocument",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Full document", content: { "application/json": { schema: { $ref: "#/components/schemas/Document" } } } },
+          "404": { description: "Not found" }
+        }
+      },
+      put: {
+        tags: ["Documents"],
+        summary: "Update a document (with optimistic concurrency)",
+        operationId: "updateDocument",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: {
+          title: { type: "string" }, state: { type: "string" },
+          pageSetup: { type: "object" }, comments: { type: "array" },
+          trackChanges: { type: "boolean" }, baseRev: { type: "integer", description: "Expected current rev (409 on mismatch)" }
+        } } } } },
+        responses: {
+          "200": { description: "Updated document", content: { "application/json": { schema: { $ref: "#/components/schemas/Document" } } } },
+          "409": { description: "Conflict — baseRev does not match current rev" }
+        }
+      },
+      delete: {
+        tags: ["Documents"],
+        summary: "Delete a document and its versions",
+        operationId: "deleteDocument",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Deleted", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/docx": {
+      put: {
+        tags: ["Docx"],
+        summary: "Upload a .docx binary (base64)",
+        operationId: "uploadDocx",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { data: { type: "string", description: "base64-encoded .docx" } }, required: ["data"] } } } },
+        responses: { "200": { description: "Uploaded" } }
+      },
+      get: {
+        tags: ["Docx"],
+        summary: "Download the .docx binary",
+        operationId: "downloadDocx",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: ".docx file stream", content: { "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { schema: { type: "string", format: "binary" } } } },
+          "404": { description: "No docx stored" }
+        }
+      }
+    },
+    "/api/documents/{id}/versions": {
+      get: {
+        tags: ["Versions"],
+        summary: "List version snapshots",
+        operationId: "listVersions",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Version list (newest last)", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/VersionSummary" } } } } }
+        }
+      }
+    },
+    "/api/documents/{id}/versions/{index}": {
+      get: {
+        tags: ["Versions"],
+        summary: "Get a specific version",
+        operationId: "getVersion",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "index", in: "path", required: true, schema: { type: "integer" } }
+        ],
+        responses: {
+          "200": { description: "Full version data", content: { "application/json": { schema: { $ref: "#/components/schemas/Version" } } } },
+          "404": { description: "Version not found" }
+        }
+      }
+    },
+    "/api/documents/{id}/restore": {
+      post: {
+        tags: ["Versions"],
+        summary: "Restore a version (snapshots current state first)",
+        operationId: "restoreVersion",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { index: { type: "integer" } }, required: ["index"] } } } },
+        responses: { "200": { description: "Restored document", content: { "application/json": { schema: { $ref: "#/components/schemas/Document" } } } } }
+      }
+    },
+    "/api/documents/{id}/content": {
+      get: {
+        tags: ["Documents"],
+        summary: "Get document content (HTML + plain text)",
+        operationId: "getContent",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: {
+          "200": { description: "Content data", content: { "application/json": { schema: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, html: { type: "string" }, text: { type: "string" }, words: { type: "integer" }, chars: { type: "integer" }, pageSetup: { type: "object" }, rev: { type: "integer" } } } } } }
+        }
+      },
+      put: {
+        tags: ["Documents"],
+        summary: "Set document content",
+        operationId: "setContent",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { html: { type: "string" }, title: { type: "string" } } } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, rev: { type: "integer" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/text": {
+      get: {
+        tags: ["Documents"],
+        summary: "Get plain text content",
+        operationId: "getText",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Plain text", content: { "application/json": { schema: { type: "object", properties: { text: { type: "string" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/insert-html": {
+      post: {
+        tags: ["Documents"],
+        summary: "Insert HTML fragment at end of document",
+        operationId: "insertHtml",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { html: { type: "string" } }, required: ["html"] } } } },
+        responses: { "200": { description: "Inserted", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, rev: { type: "integer" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/insert-text": {
+      post: {
+        tags: ["Documents"],
+        summary: "Insert plain text at end of document",
+        operationId: "insertText",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] } } } },
+        responses: { "200": { description: "Inserted", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, rev: { type: "integer" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/title": {
+      put: {
+        tags: ["Documents"],
+        summary: "Set document title",
+        operationId: "setTitle",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, rev: { type: "integer" }, title: { type: "string" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/meta": {
+      get: {
+        tags: ["Documents"],
+        summary: "Get document metadata",
+        operationId: "getMeta",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Metadata", content: { "application/json": { schema: { type: "object", properties: { id: { type: "string" }, title: { type: "string" }, rev: { type: "integer" }, pageSetup: { type: "object" }, trackChanges: { type: "boolean" }, commentCount: { type: "integer" }, words: { type: "integer" }, chars: { type: "integer" } } } } } } }
+      },
+      put: {
+        tags: ["Documents"],
+        summary: "Update document metadata (title, pageSetup)",
+        operationId: "updateMeta",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { title: { type: "string" }, pageSetup: { type: "object" } } } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, rev: { type: "integer" }, title: { type: "string" }, pageSetup: { type: "object" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/export": {
+      get: {
+        tags: ["Documents"],
+        summary: "Export document (download as file)",
+        operationId: "exportDocument",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "fmt", in: "query", required: false, schema: { type: "string", enum: ["docx", "html", "txt"], default: "docx" } }
+        ],
+        responses: {
+          "200": { description: "Binary file download" },
+          "400": { description: "Unsupported format or no docx available" }
+        }
+      }
+    },
+    "/api/documents/{id}/comments": {
+      get: {
+        tags: ["Documents"],
+        summary: "List comments",
+        operationId: "getComments",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Comments array", content: { "application/json": { schema: { type: "object", properties: { comments: { type: "array" } } } } } } }
+      },
+      post: {
+        tags: ["Documents"],
+        summary: "Add a comment",
+        operationId: "addComment",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { text: { type: "string", description: "Comment text" }, author: { type: "string" } }, required: ["text"] } } } },
+        responses: { "200": { description: "Created", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, id: { type: "string" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/track-changes": {
+      get: {
+        tags: ["Documents"],
+        summary: "Get track-changes status",
+        operationId: "getTrackChanges",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Status", content: { "application/json": { schema: { type: "object", properties: { enabled: { type: "boolean" } } } } } } }
+      },
+      put: {
+        tags: ["Documents"],
+        summary: "Enable / disable track changes",
+        operationId: "setTrackChanges",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { enabled: { type: "boolean" } }, required: ["enabled"] } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, enabled: { type: "boolean" } } } } } } }
+      }
+    },
+    "/api/documents/{id}/page-setup": {
+      get: {
+        tags: ["Documents"],
+        summary: "Get page setup",
+        operationId: "getPageSetup",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        responses: { "200": { description: "Page setup", content: { "application/json": { schema: { type: "object", properties: { pageSetup: { type: "object" } } } } } } }
+      },
+      put: {
+        tags: ["Documents"],
+        summary: "Set page setup (size, margins, orientation, header/footer)",
+        operationId: "setPageSetup",
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { size: { type: "string" }, orientation: { type: "string" }, margins: { type: "object" }, pageSetup: { type: "object" } } } } } },
+        responses: { "200": { description: "Updated", content: { "application/json": { schema: { type: "object", properties: { ok: { type: "boolean" }, pageSetup: { type: "object" } } } } } } }
+      }
+    },
+    "/api/format": {
+      post: {
+        tags: ["Documents"],
+        summary: "Apply formatting to an HTML fragment (server-side transform)",
+        operationId: "formatHtml",
+        requestBody: { content: { "application/json": { schema: { type: "object", properties: { html: { type: "string" }, cmd: { type: "string" }, value: { type: "string" } }, required: ["html", "cmd"] } } } },
+        responses: { "200": { description: "Transformed HTML", content: { "application/json": { schema: { type: "object", properties: { html: { type: "string" } } } } } } }
+      }
+    }
+  },
+  components: {
+    schemas: {
+      DocumentSummary: {
+        type: "object",
+        properties: {
+          id: { type: "string" }, title: { type: "string" },
+          updatedAt: { type: "integer" }, createdAt: { type: "integer" },
+          rev: { type: "integer" }
+        }
+      },
+      Document: {
+        type: "object",
+        properties: {
+          id: { type: "string" }, title: { type: "string" }, state: { type: "string" },
+          pageSetup: { type: "object" }, comments: { type: "array" },
+          trackChanges: { type: "boolean" },
+          createdAt: { type: "integer" }, updatedAt: { type: "integer" }, rev: { type: "integer" }
+        }
+      },
+      VersionSummary: {
+        type: "object",
+        properties: {
+          index: { type: "integer" }, t: { type: "integer", description: "timestamp" },
+          rev: { type: "integer" }, title: { type: "string" }, size: { type: "integer" }
+        }
+      },
+      Version: {
+        type: "object",
+        properties: {
+          t: { type: "integer" }, rev: { type: "integer" }, title: { type: "string" },
+          state: { type: "string" }, pageSetup: { type: "object" }, comments: { type: "array" }
+        }
+      }
+    }
+  }
+};
+
+// ─── Swagger UI ───
+SwaggerUIBundle({
+  spec,
+  dom_id: "#swagger-ui",
+  deepLinking: true,
+  presets: [SwaggerUIBundle.presets.apis],
+  layout: "BaseLayout",
+});
+
+// ─── Tab switching ───
+function showTab(name) {
+  document.getElementById("sdk-panel").style.display = name === "sdk" ? "block" : "none";
+  document.getElementById("rest-panel").style.display  = name === "rest" ? "block" : "none";
+  document.getElementById("rest-client-panel").style.display = name === "restclient" ? "block" : "none";
+  document.querySelectorAll(".menu-bar .tabs a").forEach(a => a.classList.toggle("active", a.textContent.toLowerCase().includes(name)));
+}
+window.showTab = showTab;
+</script>
+</body>
+</html>
