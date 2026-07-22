@@ -111,6 +111,7 @@ body {
 #pdf-toolbar .pdf-fit { font-size: 16px; }
 #pdf-toolbar .pdf-save { margin-left: auto; background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 #pdf-toolbar .pdf-save:hover { background: var(--accent-hover, #1f4490); }
+#pdf-toolbar .pdf-edit-text.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 #pdf-view { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px 0; }
 #pdf-view.hidden { display: none; }
 .pdf-page-wrap { position: relative; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.12); border: 1px solid var(--border); }
@@ -158,6 +159,20 @@ body.pdf-dragging .pdf-ann .ann-resize { pointer-events: none; }
   font-size: 9px; color: #2d6a3e; background: rgba(255,255,255,0.9);
   padding: 1px 4px; border-radius: 3px; pointer-events: none;
 }
+
+/* inline text-edit overlay */
+.pdf-text-layer { position: absolute; left: 0; top: 0; pointer-events: none; }
+.pdf-text-block {
+  position: absolute; box-sizing: border-box;
+  pointer-events: auto; cursor: text;
+  background: #fff;
+  border: 1px dashed transparent; border-radius: 2px;
+  color: #111; font-family: Helvetica, Arial, sans-serif;
+  white-space: pre; overflow: visible; padding: 0 2px; outline: none;
+}
+.pdf-text-block:hover { border-color: rgba(43, 87, 154, 0.4); }
+.pdf-text-block:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 2px rgba(43, 87, 154, 0.15); }
+.pdf-text-block.dirty { background: #fff8d8; }
 
 /* signature modal */
 .sig-overlay {
