@@ -23,6 +23,7 @@ let selectedAnn = null;
 let stampBuffer = null;          // dataURL for stamp image pending placement
 let sigSigBuffer = null;         // dataURL for signature image pending placement
 let sigMetaBuffer = null;         // { signer, ts } pending placement
+let stickerBuffer = null;        // { shape, color, label } pending placement
 let curveKeys = null;            // ECDSA key pair (cached in IndexedDB)
 let contextMenuEl = null;
 let hintEl = null;
@@ -137,8 +138,9 @@ function buildPdfToolbar() {
   mk("⤢", "Fit width", () => fitWidth(), "pdf-fit");
   sep();
   mk("💬", "Add comment", () => startPlacement("comment"));
+  mk("🏷", "Add sticker (sign-here / arrow / star / check)", () => openStickerPicker(), "pdf-sticker");
   mk("🖋", "Digital sign", () => openSignatureModal());
-  mk("📛", "Wet stamp", () => uploadStamp());
+  mk("📛", "Wet stamp — upload any image", () => uploadStamp());
   sep();
   mk("💾", "Save as new PDF (Ctrl/⌘+S)", saveAsNewPdf, "pdf-save");
   mk("🖨", "Print", printPdf);
@@ -254,7 +256,7 @@ function paintAnnotation(overlay, a, cap) {
     textEl.className = "ann-text";
     textEl.textContent = a.data.text;
     el.appendChild(textEl);
-    el.title = "Comment — drag to move, double-click to edit";
+    el.title = "Comment — drag body to move, drag corner to resize, double-click to edit";
     el.addEventListener("dblclick", () => {
       const t = prompt("Edit comment:", a.data.text);
       if (t !== null) { a.data.text = t; textEl.textContent = t; }
@@ -263,7 +265,7 @@ function paintAnnotation(overlay, a, cap) {
     const img = document.createElement("img");
     img.src = a.data.url; img.draggable = false;
     el.appendChild(img);
-    el.title = "Wet stamp — drag to move";
+    el.title = "Wet stamp — drag body to move, drag corner to resize";
   } else if (a.type === "signature") {
     const img = document.createElement("img");
     img.src = a.data.url; img.draggable = false;
@@ -273,7 +275,10 @@ function paintAnnotation(overlay, a, cap) {
     tag.textContent = "✓ " + (a.data.signer || "Signed");
     tag.title = "Signed by " + (a.data.signer || "?") + " at " + (a.data.ts || "");
     el.appendChild(tag);
-    el.title = "Digital signature — drag to move";
+    el.title = "Digital signature — drag body to move, drag corner to resize";
+  } else if (a.type === "sticker") {
+    paintSticker(el, a);
+    el.title = "Sticker — drag body to move, drag corner to resize, double-click to change color";
   }
   const del = document.createElement("button");
   del.className = "ann-del";
@@ -281,6 +286,12 @@ function paintAnnotation(overlay, a, cap) {
   del.title = "Delete";
   del.addEventListener("click", (e) => { e.stopPropagation(); annotations = annotations.filter(x => x.id !== a.id); el.remove(); updatePageCountHint(); });
   el.appendChild(del);
+  // resize handle (bottom-right corner)
+  const resize = document.createElement("div");
+  resize.className = "ann-resize";
+  resize.title = "Drag to resize";
+  enableResize(resize, el, a);
+  el.appendChild(resize);
   enableDrag(el, a);
   el.addEventListener("mousedown", () => selectAnn(a.id), true);
   overlay.appendChild(el);
@@ -330,14 +341,219 @@ function installDragListeners() {
 }
 function enableDrag(el, a) {
   el.addEventListener("pointerdown", (e) => {
-    if (e.target.classList.contains("ann-del")) return;
+    if (e.target.classList.contains("ann-del") || e.target.classList.contains("ann-resize")) return;
     if (e.button !== 0 && e.pointerType === "mouse") return;
-    if (dragState) return; // already dragging something else
+    if (dragState || resizeState) return; // already dragging or resizing
     installDragListeners();
     dragState = { el, ann: a, startX: e.clientX, startY: e.clientY, origX: a.x, origY: a.y, pointerId: e.pointerId };
     try { el.setPointerCapture(e.pointerId); } catch {}
     document.body.classList.add("pdf-dragging");
     e.preventDefault();
+  });
+}
+
+// Resize handle on the bottom-right corner of any annotation — uses the same
+// robust global state machine as drag.
+let resizeState = null;
+let resizeListenersInstalled = false;
+function installResizeListeners() {
+  if (resizeListenersInstalled) return;
+  resizeListenersInstalled = true;
+  const onMove = (e) => {
+    if (!resizeState) return;
+    const dx = (e.clientX - resizeState.startX) / pdfScale;
+    const dy = (e.clientY - resizeState.startY) / pdfScale;
+    const minW = 30, minH = 24;
+    resizeState.ann.w = Math.max(minW, resizeState.origW + dx);
+    resizeState.ann.h = Math.max(minH, resizeState.origH + dy);
+    resizeState.el.style.width = (resizeState.ann.w * pdfScale) + "px";
+    resizeState.el.style.height = (resizeState.ann.h * pdfScale) + "px";
+    // if it's a sticker, the painted inner SVG fills the box; no repaint needed.
+    // if it's a comment, the text wraps automatically (CSS word-wrap).
+  };
+  const onUp = () => {
+    if (!resizeState) return;
+    if (resizeState.el && resizeState.el.releasePointerCapture && resizeState.pointerId != null) {
+      try { resizeState.el.releasePointerCapture(resizeState.pointerId); } catch {}
+    }
+    resizeState = null;
+    document.body.classList.remove("pdf-dragging");
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
+  window.addEventListener("mouseup", onUp);
+  window.addEventListener("blur", onUp);
+}
+function enableResize(handle, el, a) {
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (dragState || resizeState) return;
+    installResizeListeners();
+    resizeState = { el, ann: a, startX: e.clientX, startY: e.clientY, origW: a.w, origH: a.h, pointerId: e.pointerId };
+    try { handle.setPointerCapture(e.pointerId); } catch {}
+    document.body.classList.add("pdf-dragging");
+    e.stopPropagation();
+    e.preventDefault();
+  });
+}
+
+// ---- sticker shapes ----
+const STICKER_SHAPES = {
+  "sign-here": null,  // drawn as a callout tag
+  arrow: null,        // drawn as a thick arrow
+  star: null,         // 5-point star
+  check: null,        // check mark
+  circle: null,       // empty circle outline
+};
+const STICKER_COLORS = ["#e74c3c", "#f39c12", "#f1c40f", "#27ae60", "#2b579a", "#9b59b6", "#000000"];
+
+function paintSticker(el, a) {
+  const shape = a.data.shape || "sign-here";
+  const color = a.data.color || "#e74c3c";
+  const label = a.data.label || (shape === "sign-here" ? "Sign Here" : "");
+  el.style.background = "transparent";
+  if (shape === "sign-here") {
+    el.style.background = color;
+    el.style.color = "#fff";
+    el.style.borderRadius = "6px";
+    el.style.display = "flex";
+    el.style.alignItems = "center";
+    el.style.justifyContent = "center";
+    el.style.fontWeight = "700";
+    el.style.fontSize = "14px";
+    el.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+    el.style.transform = "rotate(-3deg)";
+    const span = document.createElement("span");
+    span.style.padding = "4px 10px";
+    span.style.textAlign = "center";
+    span.style.pointerEvents = "none";
+    span.textContent = label || "Sign Here";
+    el.appendChild(span);
+  } else {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
+    svg.style.pointerEvents = "none";
+    svg.style.overflow = "visible";
+    let path = "";
+    const fill = color;
+    if (shape === "arrow") {
+      path = '<path d="M5,35 L60,35 L60,15 L95,50 L60,85 L60,65 L5,65 Z" fill="' + fill + '"/>';
+    } else if (shape === "star") {
+      const cx = 50, cy = 48, r1 = 45, r2 = 18;
+      let pts = "";
+      for (let i = 0; i < 10; i++) {
+        const r = (i % 2 === 0) ? r1 : r2;
+        const a2 = (Math.PI / 5) * i - Math.PI / 2;
+        pts += (cx + r * Math.cos(a2)).toFixed(1) + "," + (cy + r * Math.sin(a2)).toFixed(1) + " ";
+      }
+      path = '<polygon points="' + pts.trim() + '" fill="' + fill + '" stroke="rgba(0,0,0,0.15)" stroke-width="1"/>';
+    } else if (shape === "check") {
+      path = '<path d="M15,55 L40,80 L85,25" stroke="' + fill + '" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>';
+    } else if (shape === "circle") {
+      path = '<circle cx="50" cy="50" r="44" fill="none" stroke="' + fill + '" stroke-width="6"/>';
+    }
+    svg.innerHTML = path;
+    el.appendChild(svg);
+  }
+  // double-click stickers (except sign-here) to change color
+  if (shape !== "sign-here") {
+    el.addEventListener("dblclick", () => {
+      const idx = STICKER_COLORS.indexOf(color);
+      a.data.color = STICKER_COLORS[(idx + 1) % STICKER_COLORS.length];
+      el.innerHTML = "";
+      paintStickerShapeOnly(el, a);
+      el.appendChild(delRefFor(a, el));
+      el.appendChild(resizeRefFor(a, el));
+    });
+  }
+}
+// re-paint a sticker's inner SVG/visual when color changes
+function paintStickerShapeOnly(el, a) {
+  paintSticker(el, a);
+}
+function delRefFor(a, el) {
+  const del = document.createElement("button");
+  del.className = "ann-del"; del.textContent = "×"; del.title = "Delete";
+  del.addEventListener("click", (e) => { e.stopPropagation(); annotations = annotations.filter(x => x.id !== a.id); el.remove(); updatePageCountHint(); });
+  return del;
+}
+function resizeRefFor(a, el) {
+  const resize = document.createElement("div");
+  resize.className = "ann-resize"; resize.title = "Drag to resize";
+  enableResize(resize, el, a);
+  return resize;
+}
+
+function openStickerPicker() {
+  // overlay modal
+  const overlay = document.createElement("div");
+  overlay.className = "sig-overlay";
+  const box = document.createElement("div");
+  box.className = "sig-modal sticker-modal";
+  const shapeChoices = Object.keys(STICKER_SHAPES);
+  const shapeLabels = { "sign-here": "Sign Here", arrow: "Arrow", star: "Star", check: "Check", circle: "Circle" };
+  box.innerHTML = `
+    <h3>Add a sticker</h3>
+    <div class="sticker-shapes"></div>
+    <div class="sticker-colors"></div>
+    <label class="sig-name" style="margin-top: 8px;">Label text (Sign Here only) <input type="text" value="Sign Here" placeholder="Sign Here" /></label>
+    <div class="sig-actions">
+      <button class="sig-cancel">Cancel</button>
+      <button class="sig-ok">Place sticker</button>
+    </div>
+  `;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  let chosenShape = "sign-here";
+  let chosenColor = "#e74c3c";
+  // shape preview renders
+  const shapesHost = box.querySelector(".sticker-shapes");
+  for (const s of shapeChoices) {
+    const btn = document.createElement("button");
+    btn.className = "sticker-choice" + (s === chosenShape ? " active" : "");
+    btn.title = shapeLabels[s];
+    const preview = document.createElement("div");
+    preview.style.width = "52px"; preview.style.height = "52px"; preview.style.display = "flex"; preview.style.alignItems = "center"; preview.style.justifyContent = "center";
+    paintSticker(preview, { data: { shape: s, color: chosenColor, label: s === "sign-here" ? "Sign Here" : "" } });
+    btn.appendChild(preview);
+    btn.addEventListener("click", () => {
+      chosenShape = s;
+      box.querySelectorAll(".sticker-choice").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      // re-paint already-active shape previews keep current color; no-op
+    });
+    shapesHost.appendChild(btn);
+  }
+  const colorsHost = box.querySelector(".sticker-colors");
+  for (const c of STICKER_COLORS) {
+    const sw = document.createElement("button");
+    sw.className = "sticker-swatch" + (c === chosenColor ? " active" : "");
+    sw.style.background = c;
+    sw.title = c;
+    sw.addEventListener("click", () => {
+      chosenColor = c;
+      box.querySelectorAll(".sticker-swatch").forEach(b => b.classList.remove("active"));
+      sw.classList.add("active");
+      // re-paint shape previews with new color
+      box.querySelectorAll(".sticker-choice").forEach((b, i) => {
+        const s = shapeChoices[i];
+        const pv = b.querySelector("div");
+        if (!pv) return;
+        pv.innerHTML = "";
+        paintSticker(pv, { data: { shape: s, color: chosenColor, label: s === "sign-here" ? "Sign Here" : "" } });
+      });
+    });
+    colorsHost.appendChild(sw);
+  }
+  box.querySelector(".sig-cancel").addEventListener("click", () => overlay.remove());
+  box.querySelector(".sig-ok").addEventListener("click", () => {
+    const label = (box.querySelector(".sig-name input").value || "").trim() || "Sign Here";
+    stickerBuffer = { shape: chosenShape, color: chosenColor, label };
+    overlay.remove();
+    startPlacement("sticker");
   });
 }
 
@@ -398,6 +614,12 @@ function onPdfViewClick(e) {
     if (!sigSigBuffer) { cancelPlacement(); return; }
     newAnn("signature", page, x, y, 200, 80, { url: sigSigBuffer, signer: sigMetaBuffer.signer, ts: sigMetaBuffer.ts });
     renderAnnotationsOnly(page);
+  } else if (placementMode.type === "sticker") {
+    if (!stickerBuffer) { cancelPlacement(); return; }
+    const shape = stickerBuffer.shape;
+    const label = stickerBuffer.label || (shape === "sign-here" ? "Sign Here" : "");
+    newAnn("sticker", page, x, y, shape === "sign-here" ? 140 : 80, shape === "sign-here" ? 40 : 80, { shape, color: stickerBuffer.color, label });
+    renderAnnotationsOnly(page);
   }
   cancelPlacement();
 }
@@ -409,6 +631,7 @@ function cancelPlacement() {
   stampBuffer = null;
   sigSigBuffer = null;
   sigMetaBuffer = null;
+  stickerBuffer = null;
 }
 function renderAnnotationsOnly(page) {
   const cap = document.getElementById(`pdf-page-${page}`);
@@ -559,6 +782,8 @@ async function saveAsNewPdf() {
         await embedImage(doc, page, a.data.url, x, yBottom, a.w, a.h);
         page.drawText("Digitally signed", { x, y: yBottom - 10, size: 7, font: helvOblique, color: rgb(0.1, 0.4, 0.2) });
         page.drawText(`${a.data.signer || "Anonymous"} · ${(a.data.ts || "").slice(0,19).replace("T", " ")}`, { x, y: yBottom - 20, size: 7, font: helv, color: rgb(0.3, 0.3, 0.3) });
+      } else if (a.type === "sticker") {
+        drawStickerPdf(page, a, x, yBottom, helv, helvBold, rgb);
       }
     }
     saveSignedMetadata(doc, annotations);
@@ -612,6 +837,90 @@ async function embedImage(doc, page, dataUrl, x, yBottom, w, h) {
   if (isPng) img = await doc.embedPng(bytes);
   else img = await doc.embedJpg(bytes);
   page.drawImage(img, { x, y: yBottom, width: w, height: h });
+}
+
+// hexlike #rrggbb → {r,g,b} each 0..1 for pdf-lib rgb()
+function hexToRgb(hex) {
+  const h = (hex || "#000000").replace("#", "");
+  return {
+    r: parseInt(h.slice(0, 2), 16) / 255,
+    g: parseInt(h.slice(2, 4), 16) / 255,
+    b: parseInt(h.slice(4, 6), 16) / 255,
+  };
+}
+
+function drawStickerPdf(page, a, x, yBottom, helv, helvBold, rgb) {
+  const shape = a.data.shape || "sign-here";
+  const color = a.data.color || "#e74c3c";
+  const c = hexToRgb(color);
+  const w = a.w, h = a.h;
+  if (shape === "sign-here") {
+    page.drawRectangle({ x, y: yBottom, width: w, height: h, color: rgb(c.r, c.g, c.b), borderColor: rgb(0, 0, 0), borderWidth: 1 });
+    const label = a.data.label || "Sign Here";
+    const size = Math.min(14, Math.floor(h * 0.45));
+    const tw = helvBold.widthOfTextAtSize(label, size);
+    page.drawText(label, { x: x + (w - tw) / 2, y: yBottom + h / 2 - size / 2 + 1, size, font: helvBold, color: rgb(1, 1, 1) });
+  } else if (shape === "arrow") {
+    // Approach: draw a large arrow approximation using polygons
+    // Draw an orange-ish rectangle for the shaft and a triangle arrowhead.
+    const shaftH = h * 0.35;
+    const shaftY = yBottom + (h - shaftH) / 2;
+    const shaftW = w * 0.7;
+    page.drawRectangle({ x, y: shaftY, width: shaftW, height: shaftH, color: rgb(c.r, c.g, c.b) });
+    // triangle head — approximate using three drawRectangle smudges... but pdf-lib has drawSvgPath
+    const hx = x + shaftW;
+    const tipX = x + w;
+    const cy = yBottom + h / 2;
+    try {
+      page.drawSvgPath(`M ${shaftW} 0 L ${w} ${h/2} L ${shaftW} ${h} Z`,
+        { x, y: yBottom + h, borderColor: rgb(c.r, c.g, c.b), color: rgb(c.r, c.g, c.b), borderWidth: 0, scale: 1 });
+    } catch {
+      // fallback if drawSvgPath not available — three thin rectangles triangulating the head
+      page.drawRectangle({ x: hx, y: yBottom + h*0.05, width: w*0.3, height: h*0.45, color: rgb(c.r, c.g, c.b) });
+      page.drawRectangle({ x: hx, y: yBottom + h*0.5,  width: w*0.3, height: h*0.45, color: rgb(c.r, c.g, c.b) });
+      page.drawRectangle({ x: hx + w*0.25, y: yBottom + h*0.25, width: w*0.05, height: h*0.5, color: rgb(c.r, c.g, c.b) });
+    }
+  } else if (shape === "star") {
+    // 5-point star path. pdf-lib uses bottom-up coords with origin at top-left of translate group.
+    // Build the star in local coords sized to w×h, upside-down since y axis flips.
+    const cx = w / 2, cy = h / 2, r1 = Math.min(w, h) * 0.5, r2 = r1 * 0.4;
+    let d = "";
+    for (let i = 0; i < 10; i++) {
+      const r = (i % 2 === 0) ? r1 : r2;
+      const ang = (Math.PI / 5) * i - Math.PI / 2;
+      const px = cx + r * Math.cos(ang);
+      const py = cy + r * Math.sin(ang);
+      d += (i === 0 ? "M " : " L ") + px.toFixed(1) + " " + py.toFixed(1);
+    }
+    d += " Z";
+    try {
+      page.drawSvgPath(d, { x, y: yBottom + h, color: rgb(c.r, c.g, c.b), borderColor: rgb(0,0,0), borderWidth: 0.5 });
+    } catch {}
+  } else if (shape === "check") {
+    // thick stroke check — pdf-lib doesn't support stroke thickness easily; draw filled polygons
+    try {
+      page.drawSvgPath("M 10 50 L 40 78 L 80 22", { x, y: yBottom + h, borderColor: rgb(c.r, c.g, c.b), borderWidth: Math.min(14, h*0.18), borderLineCap: "round", color: rgb(1,1,1) });
+    } catch {
+      page.drawText("✓", { x, y: yBottom, size: Math.min(h, w) * 0.9, font: helvBold, color: rgb(c.r, c.g, c.b) });
+    }
+  } else if (shape === "circle") {
+    // Approximate circle with many short lines — pdf-lib supports drawEllipse since 1.16+
+    try {
+      page.drawEllipse({ x: x + w/2, y: yBottom + h/2, xScale: w/2 - 1, yScale: h/2 - 1, borderColor: rgb(c.r, c.g, c.b), borderWidth: 4 });
+    } catch {
+      // fallback: draw circle path
+      const seg = 48;
+      let d = "";
+      for (let i = 0; i <= seg; i++) {
+        const ang = (2 * Math.PI * i) / seg;
+        const px = w/2 + (w/2 - 2) * Math.cos(ang);
+        const py = h/2 + (h/2 - 2) * Math.sin(ang);
+        d += (i === 0 ? "M " : " L ") + px.toFixed(1) + " " + py.toFixed(1);
+      }
+      d += " Z";
+      try { page.drawSvgPath(d, { x, y: yBottom + h, borderColor: rgb(c.r, c.g, c.b), borderWidth: 4 }); } catch {}
+    }
+  }
 }
 function dataURLToBytes(d) {
   const b = atob(d.split(",")[1] || d);
@@ -700,6 +1009,7 @@ function showContextMenu(e, cap) {
     items.push({ label: "➕ Add comment via dialog", fn: () => { startPlacement("comment"); } });
     items.push({ label: "🧿 Place wet stamp here", fn: () => { if (!stampBuffer) { uploadStamp(); } else { newAnn("stamp", page, x, y, 120, 120, { url: stampBuffer }); renderAnnotationsOnly(page); } } });
     items.push({ label: "🖋 Place signature here", fn: () => { openSignatureModal(); } });
+    items.push({ label: "🏷 Place sticker here", fn: () => { openStickerPicker(); } });
     items.push({ sep: true });
     items.push({ label: "🔍 Zoom in", fn: () => setScale(pdfScale * 1.2) });
     items.push({ label: "🔍 Zoom out", fn: () => setScale(pdfScale / 1.2) });

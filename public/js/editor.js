@@ -76,7 +76,7 @@ function showTip(target) {
   tipEl.style.top = top + "px";
 }
 export function initTooltips() {
-  const SCOPE = "#toolbar,#topbar,.table-toolbar,.img-toolbar,.find-panel";
+  const SCOPE = "#toolbar,#topbar,.table-toolbar,.img-toolbar,.find-panel,#pdf-toolbar";
   document.addEventListener("mouseover", (e) => {
     const t = e.target.closest && e.target.closest("[title],[data-tip]");
     if (!t || !t.closest(SCOPE)) return;
