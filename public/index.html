@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WordEditor — Online Document Editor</title>
+  <title>DocEditor — Online Document Editor</title>
   <script>
     if (new URLSearchParams(location.search).get("embed") === "1") {
       location.replace("/editor.html" + location.search);
@@ -104,7 +104,7 @@ footer .foot-meta code { font-family: "SF Mono", Menlo, Consolas, monospace; fon
 <body>
 
 <div class="header">
-  <div class="logo">WordEditor</div>
+  <div class="logo">DocEditor</div>
   <div class="nav">
     <a href="/editor.html">Editor</a>
     <a href="/embed-demo.html">Embed demo</a>
@@ -117,7 +117,7 @@ footer .foot-meta code { font-family: "SF Mono", Menlo, Consolas, monospace; fon
 <div class="page">
 
   <div class="hero">
-    <h1>Word-Compatible Editor</h1>
+    <h1>Word and pdf Compatible Editor</h1>
     <p>
       A full-featured rich-text editor that runs entirely in the browser — .docx
       import/export, real-time collaboration, track changes, comments, page layout,
@@ -135,7 +135,7 @@ footer .foot-meta code { font-family: "SF Mono", Menlo, Consolas, monospace; fon
     <div class="frame">
       <div class="bar">
         <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
-        <span class="label">WordEditor — /</span>
+        <span class="label">DocEditor — /</span>
         <span style="flex:1"></span>
         <span id="frame-status" style="font-size:11px;color:var(--muted)">connecting…</span>
       </div>
@@ -184,8 +184,8 @@ footer .foot-meta code { font-family: "SF Mono", Menlo, Consolas, monospace; fon
     <div class="card"><h3>🎨 Rich formatting</h3><p>Bold, italic, underline, strikethrough, subscript, superscript, font family, size, color, highlight, alignment, indent.</p></div>
     <div class="card"><h3>🖼 Images, tables, shapes</h3><p>Insert inline images, WordArt, shapes, tables, hyperlinks, symbols, page breaks, horizontal rules.</p></div>
     <div class="card"><h3>🔌 Embed SDK</h3><p>Mount the editor in any page with <code>&lt;script src="sdk.js"&gt;</code>. Full postMessage API — 50+ commands.</p></div>
-    <div class="card"><h3>🌐 REST API</h3><p>All document operations available as HTTP endpoints. Use the <code>WordEditorRestClient</code> from any language.</p></div>
-    <div class="card"><h3>📄 PDF viewer + annotate &amp; sign</h3><p>Open any <code>.pdf</code> — zoom (Ctrl+scroll), fit-width/screen, page nav, add comments, upload wet stamps, and **apply real ECDSA-P-256 digital signatures**. Save everything as a new PDF (via pdf-lib) with a <code>.sig.json</code> sidecar for offline verification.</p></div>
+    <div class="card"><h3>🌐 REST API</h3><p>All document operations available as HTTP endpoints. Use the <code>DocEditorRestClient</code> from any language.</p></div>
+    <div class="card"><h3>📄 PDF viewer, editor &amp; sign</h3><p>Open any <code>.pdf</code> — zoom (Ctrl+scroll), fit-width/screen, page nav, add comments, upload wet stamps, and apply real <b>ECDSA-P-256 digital signatures</b>. Click the ✏️ tool to <b>edit text directly in place</b> — changes are baked into the page when you save. Save everything as a new PDF (via pdf-lib) with a <code>.sig.json</code> sidecar for offline verification.</p></div>
     <div class="card"><h3>⚡ Single binary</h3><p>Zero-dependency Node.js server. No npm install, no database — just <code>node server.js</code> and it runs.</p></div>
   </div>
 
@@ -219,7 +219,7 @@ footer .foot-meta code { font-family: "SF Mono", Menlo, Consolas, monospace; fon
 <footer>
   <div class="foot-inner">
     <div class="foot-left">
-      WordEditor — built with vanilla JavaScript, zero dependencies
+      DocEditor — built with vanilla JavaScript, zero dependencies
     </div>
     <div class="foot-right">
       <a href="https://github.com/fjsimonwang/word-editor" target="_blank" class="foot-gh">
@@ -239,7 +239,7 @@ footer .foot-meta code { font-family: "SF Mono", Menlo, Consolas, monospace; fon
   var resEl = document.getElementById("api-result");
   var statusEl = document.getElementById("frame-status");
 
-  var ed = WordEditor.init({
+  var ed = DocEditor.init({
     container: "#frame-body",
     user: "Demo",
     onReady: function (i) { statusEl.textContent = "ready · doc " + i.id.slice(0,8); },

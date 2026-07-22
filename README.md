@@ -83,7 +83,7 @@ docker run -d --name word-editor -p 3001:3001 -v word-editor-data:/app/data word
 ```html
 <script src="http://your-host:3001/js/sdk.js"></script>
 <script>
-  const ed = WordEditor.init({
+  const ed = DocEditor.init({
     container: "#holder",
     docId: "…",              // optional
     mode: "edit",            // "edit" | "view"

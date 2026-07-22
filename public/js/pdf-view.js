@@ -956,10 +956,10 @@ function saveSignedMetadata(doc, anns) {
   if (!sigAnns.length) return;
   const meta = sigAnns.map(s => `${s.data.signer || "?"}|${s.data.ts || ""}`).join("; ");
   try {
-    doc.setSubject("WordEditor: " + meta);
+    doc.setSubject("DocEditor: " + meta);
     doc.setKeywords(["word-editor", "signed", "ecdsa-sha-256"]);
-    doc.setProducer("WordEditor PDF viewer");
-    doc.setCreator("WordEditor");
+    doc.setProducer("DocEditor PDF viewer");
+    doc.setCreator("DocEditor");
   } catch {}
 }
 

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>WordEditor SDK — embed example</title>
+  <title>DocEditor SDK — embed example</title>
   <style>
     body { font-family: -apple-system, "Segoe UI", sans-serif; margin: 24px; background: #eef0f4; }
     h1 { font-size: 18px; }
@@ -13,7 +13,7 @@
   </style>
 </head>
 <body>
-  <h1>WordEditor SDK — embed example</h1>
+  <h1>DocEditor SDK — embed example</h1>
   <div id="controls">
     <button onclick="demo.insert()">Insert text</button>
     <button onclick="demo.getContent()">Get content</button>
@@ -30,7 +30,7 @@
     const logEl = document.getElementById("log");
     const log = (...a) => { logEl.textContent += a.map(x => typeof x === "string" ? x : JSON.stringify(x)).join(" ") + "\n"; logEl.scrollTop = 1e9; };
 
-    const editor = WordEditor.init({
+    const editor = DocEditor.init({
       container: "#holder",
       user: "SDK-Demo",
       onReady: (i) => log("ready:", i),

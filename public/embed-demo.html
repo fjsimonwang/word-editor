@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>WordEditor SDK — Embed API demo</title>
+  <title>DocEditor SDK — Embed API demo</title>
   <link rel="stylesheet" href="/css/app.css" />
   <style>
     /* Demo page chrome — the iframe is a *small* framed app inside the host page,
@@ -51,7 +51,7 @@
     <aside class="host-side">
       <header>
         <h1>Host app — controls</h1>
-        <p>Drives the embedded WordEditor via the JS SDK and postMessage API.</p>
+        <p>Drives the embedded DocEditor via the JS SDK and postMessage API.</p>
       </header>
       <div class="host-scroll">
 
@@ -263,7 +263,7 @@
     <!-- Right: the embed is constrained to a small framed area inside the host page -->
     <main class="host-frame">
       <div class="bar">
-        <span class="title">Embedded WordEditor</span>
+        <span class="title">Embedded DocEditor</span>
         <span class="status-pill" id="ready-state">not ready</span>
         <span class="meta" id="doc-state">—</span>
         <span style="flex:1"></span>
@@ -280,7 +280,7 @@
     const log = (...a) => console.log(...a);
     const val = (id) => document.getElementById(id).value;
 
-    const editor = WordEditor.init({
+    const editor = DocEditor.init({
       container: "#editor-holder",
       user: "Host-Demo",
       onReady: (i) => { log("ready:", i); document.getElementById("ready-state").textContent = "ready"; document.getElementById("ready-state").classList.add("live"); },

@@ -1,10 +1,10 @@
 /**
- * WordEditor SDK — embed the Word-Compatible Editor in any web page.
+ * DocEditor SDK — embed the Word-Compatible Editor in any web page.
  *
  * Usage:
  *   <script src="http://your-editor-host/js/sdk.js"></script>
  *   <script>
- *     const ed = WordEditor.init({
+ *     const ed = DocEditor.init({
  *       container: "#editor-holder",        // element or selector
  *       baseUrl: "http://localhost:3001",   // editor server (defaults to script origin)
  *       docId: "…",                          // optional: open an existing document
@@ -69,7 +69,7 @@
     const container = typeof opts.container === "string"
       ? document.querySelector(opts.container)
       : opts.container;
-    if (!container) throw new Error("WordEditor.init: container not found");
+    if (!container) throw new Error("DocEditor.init: container not found");
 
     const baseUrl = (opts.baseUrl || scriptOrigin).replace(/\/$/, "");
     const q = new URLSearchParams();
@@ -120,7 +120,7 @@
         setTimeout(() => {
           if (pending.has(id)) {
             pending.delete(id);
-            reject(new Error("WordEditor: timeout for " + cmd));
+            reject(new Error("DocEditor: timeout for " + cmd));
           }
         }, 15000);
       });
@@ -209,5 +209,5 @@
     };
   }
 
-  global.WordEditor = { init, version: "3.0.0" };
+  global.DocEditor = { init, version: "3.0.0" };
 })(window);
