@@ -297,26 +297,48 @@ function deselectAll() {
   selectedAnn = null;
 }
 
+// Single global drag state machine — robust against mouseup outside the window,
+// iframe focus loss, or repeated mousedowns. Uses pointer events with capture.
+let dragState = null;
+let dragListenersInstalled = false;
+function installDragListeners() {
+  if (dragListenersInstalled) return;
+  dragListenersInstalled = true;
+  const onMove = (e) => {
+    if (!dragState) return;
+    const dx = (e.clientX - dragState.startX) / pdfScale;
+    const dy = (e.clientY - dragState.startY) / pdfScale;
+    dragState.ann.x = Math.max(0, dragState.origX + dx);
+    dragState.ann.y = Math.max(0, dragState.origY + dy);
+    dragState.el.style.left = (dragState.ann.x * pdfScale) + "px";
+    dragState.el.style.top = (dragState.ann.y * pdfScale) + "px";
+  };
+  const onUp = () => {
+    if (!dragState) return;
+    if (dragState.el && dragState.el.releasePointerCapture && dragState.pointerId != null) {
+      try { dragState.el.releasePointerCapture(dragState.pointerId); } catch {}
+    }
+    dragState = null;
+    document.body.classList.remove("pdf-dragging");
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+  window.addEventListener("pointercancel", onUp);
+  // backstops for non-pointer browsers / lost capture
+  window.addEventListener("mouseup", onUp);
+  window.addEventListener("blur", onUp);
+}
 function enableDrag(el, a) {
-  let startX, startY, origX, origY, dragging = false;
-  el.addEventListener("mousedown", (e) => {
+  el.addEventListener("pointerdown", (e) => {
     if (e.target.classList.contains("ann-del")) return;
-    if (e.button !== 0) return;
-    dragging = true;
-    startX = e.clientX; startY = e.clientY;
-    origX = a.x; origY = a.y;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    if (dragState) return; // already dragging something else
+    installDragListeners();
+    dragState = { el, ann: a, startX: e.clientX, startY: e.clientY, origX: a.x, origY: a.y, pointerId: e.pointerId };
+    try { el.setPointerCapture(e.pointerId); } catch {}
+    document.body.classList.add("pdf-dragging");
     e.preventDefault();
   });
-  document.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    const dx = (e.clientX - startX) / pdfScale;
-    const dy = (e.clientY - startY) / pdfScale;
-    a.x = Math.max(0, origX + dx);
-    a.y = Math.max(0, origY + dy);
-    el.style.left = (a.x * pdfScale) + "px";
-    el.style.top = (a.y * pdfScale) + "px";
-  });
-  document.addEventListener("mouseup", () => { dragging = false; }, { once: true });
 }
 
 function updatePageCountHint() {
@@ -718,7 +740,7 @@ function setupInteraction() {
   });
   document.addEventListener("keydown", (e) => {
     if (!pdfMode) return;
-    if (e.key === "Escape") { if (placementMode) { cancelPlacement(); } else { hideContextMenu(); closePdf(); } }
+    if (e.key === "Escape") { if (placementMode) { cancelPlacement(); } else { hideContextMenu(); deselectAll(); } }
     if (e.key === "Delete" && selectedAnn) {
       annotations = annotations.filter(a => a.id !== selectedAnn.id);
       const el = document.querySelector(`.pdf-ann[data-id="${selectedAnn.id}"]`);

@@ -208,6 +208,11 @@ body {
 .pdf-ctx button:hover { background: #eef1f6; }
 .pdf-ctx .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
 
+/* while dragging an annotation, suppress text selection & pointer events on siblings */
+body.pdf-dragging { user-select: none; cursor: move !important; }
+body.pdf-dragging .pdf-ann { pointer-events: none; }
+body.pdf-dragging .pdf-ann * { pointer-events: none; }
+
 /* placement hint */
 .pdf-hint {
   position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%);

@@ -1267,7 +1267,7 @@ async function main() {
   // ---- keyboard shortcuts ----
   window.addEventListener("keydown", (e) => {
     // Esc closes the PDF viewer and returns to editing
-    if (e.key === "Escape" && isPdfMode()) { closePdf(); return; }
+    // Esc in PDF mode is handled by the pdf-view module (deselect / cancel placement) — no auto-close
     const mod = e.metaKey || e.ctrlKey;
     if (!mod) return;
     const k = e.key.toLowerCase();
