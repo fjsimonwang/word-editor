@@ -152,6 +152,12 @@ export class SyncClient {
       this.connect();
     }
   }
+  leave(docId) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try { this.ws.send(JSON.stringify({ type: "leave", docId: docId || this.docId, user: this.user })); } catch {}
+    }
+    this.docId = null;
+  }
   connect() {
     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
     this.closedByUs = false;

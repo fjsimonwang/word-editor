@@ -16,38 +16,40 @@
           <button id="btn-file" title="File menu">File ▾</button>
           <div class="dropdown-menu menu-vertical hidden" id="file-menu">
             <button id="btn-new" title="New document">New</button>
-            <button id="btn-open" title="Open .docx / .txt / .html file">Open…</button>
+            <button id="btn-open" title="Open .docx / .txt / .html / .pdf file">Open…</button>
             <div class="dropdown submenu" id="export-menu-wrap">
               <button id="btn-export" title="Download / export">Export ▸</button>
               <div class="dropdown-menu menu-vertical hidden" id="export-menu">
-                <button data-fmt="docx">Word (.docx)</button>
-                <button data-fmt="pdf">PDF (print)</button>
-                <button data-fmt="html">Web page (.html)</button>
-                <button data-fmt="txt">Plain text (.txt)</button>
+                <button data-fmt="docx" title="Export as Word .docx (Office Open XML)">Word (.docx)</button>
+                <button data-fmt="pdf" title="Print to PDF via the browser print dialog">PDF (print)</button>
+                <button data-fmt="html" title="Save as a self-contained .html web page">Web page (.html)</button>
+                <button data-fmt="txt" title="Export plain text content">Plain text (.txt)</button>
               </div>
             </div>
             <button id="btn-list" title="Saved documents">Library…</button>
             <button id="btn-print" title="Print / PDF">Print…</button>
+            <div class="menu-sep"></div>
+            <button id="btn-close" title="Close the current document or PDF and start fresh">Close file</button>
           </div>
         </div>
         <div class="dropdown" id="insert-menu-wrap">
           <button id="btn-insert" title="Insert menu">Insert ▾</button>
           <div class="dropdown-menu menu-vertical hidden" id="insert-menu">
-            <button data-ins="pagebreak">Page break</button>
-            <button data-ins="blankpage">Blank page</button>
+            <button data-ins="pagebreak" title="Insert a page break at the cursor">Page break</button>
+            <button data-ins="blankpage" title="Insert a blank page">Blank page</button>
             <div class="menu-sep"></div>
-            <button data-ins="picture">Picture…</button>
-            <button data-ins="table">Table…</button>
-            <button data-ins="link">Link…</button>
-            <button data-ins="hr">Horizontal line</button>
-            <button data-ins="symbol">Symbol…</button>
+            <button data-ins="picture" title="Insert an image from your computer">Picture…</button>
+            <button data-ins="table" title="Insert a table with chosen rows / columns">Table…</button>
+            <button data-ins="link" title="Insert or edit a hyperlink">Link…</button>
+            <button data-ins="hr" title="Insert a horizontal rule">Horizontal line</button>
+            <button data-ins="symbol" title="Insert a special character (© · π → …)">Symbol…</button>
             <div class="menu-sep"></div>
-            <button data-ins="wordart">WordArt…</button>
-            <button data-ins="shape">Shape…</button>
+            <button data-ins="wordart" title="Insert stylized WordArt text">WordArt…</button>
+            <button data-ins="shape" title="Insert a shape (rectangle, arrow, star, …)">Shape…</button>
             <div class="menu-sep"></div>
-            <button data-ins="header">Header</button>
-            <button data-ins="footer">Footer</button>
-            <button data-ins="pagenum">Page number…</button>
+            <button data-ins="header" title="Edit the document header">Header</button>
+            <button data-ins="footer" title="Edit the document footer">Footer</button>
+            <button data-ins="pagenum" title="Insert page numbers (top / bottom, left / center / right)">Page number…</button>
           </div>
         </div>
         <button id="btn-comments" title="Comments panel">Comments</button>

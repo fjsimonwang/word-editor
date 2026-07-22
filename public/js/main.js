@@ -1000,6 +1000,18 @@ async function main() {
     if (isPdfMode()) { const info = getPdfInfo(); if (info) { /* delegate to pdf-view's print via its toolbar button */ const btn = document.querySelector("#pdf-toolbar button[title='Print']"); if (btn) btn.click(); return; } }
     window.print();
   });
+  if ($("btn-close")) $("btn-close").addEventListener("click", async () => {
+    closeFileMenu();
+    // PDF: close viewer and return to editor
+    if (isPdfMode()) { closePdf(); return; }
+    // Document: flush, clear editor, create a fresh blank doc
+    await autosaver.flush();
+    if (current && current.id) sync.leave(current.id);
+    const meta = await createDocument("Untitled");
+    await loadDocument(meta.id);
+    localStorage.removeItem(LS_KEY);
+    editor.focus();
+  });
   fileMenu.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b || b.id === "btn-export") return; // keep menu open to show the Export flyout
