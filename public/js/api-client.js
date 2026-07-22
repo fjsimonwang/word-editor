@@ -1,9 +1,9 @@
 /**
- * WordEditor REST API Client — use the editor from ANY HTTP client
+ * DocEditor REST API Client — use the editor from ANY HTTP client
  * (no iframe, no postMessage).
  *
  * Usage:
- *   const api = new WordEditorRestClient("http://localhost:3001");
+ *   const api = new DocEditorRestClient("http://localhost:3001");
  *   await api.createDocument("Report");
  *   await api.setContent("<p>Hello</p>");
  *   const meta = await api.getMeta();
@@ -14,7 +14,7 @@
 (function (global) {
   "use strict";
 
-  class WordEditorRestClient {
+  class DocEditorRestClient {
     /**
      * @param {string} baseUrl  Server base URL (e.g. "http://localhost:3001")
      * @param {string} [docId]  Optional document ID (auto-creates if omitted)
@@ -351,5 +351,5 @@
     }
   }
 
-  global.WordEditorRestClient = WordEditorRestClient;
+  global.DocEditorRestClient = DocEditorRestClient;
 })(window);

@@ -1,6 +1,7 @@
-// pdf-view.js — read-only PDF viewer with annotations.
-// Uses pdf.js (Mozilla) for rendering, pdf-lib for save, WebCrypto (ECDSA P-256)
-// for real digital signatures. Loaded lazily from CDN only when a PDF is opened.
+// pdf-view.js — PDF viewer with annotations + editable text overlay.
+// Uses pdf.js (Mozilla) for rendering + text extraction, pdf-lib for save,
+// WebCrypto (ECDSA P-256) for real digital signatures. Loaded lazily from
+// CDN only when a PDF is opened.
 //
 // Exports: openPdf, closePdf, isPdfMode, getPdfInfo
 
@@ -28,6 +29,9 @@ let curveKeys = null;            // ECDSA key pair (cached in IndexedDB)
 let contextMenuEl = null;
 let hintEl = null;
 let wheelZoomListener = null;
+let editTextMode = false;        // toggle for text-edit overlay
+let textBlocks = [];             // [{ page, x, y, w, h, text, fontName, fontSize, color, el, dirty }]
+let textBlocksLoaded = false;
 
 function $(id) { return document.getElementById(id); }
 
@@ -142,6 +146,7 @@ function buildPdfToolbar() {
   mk("🖋", "Digital sign", () => openSignatureModal());
   mk("📛", "Wet stamp — upload any image", () => uploadStamp());
   sep();
+  mk("✏️", "Toggle inline text editing (changes are baked into the saved PDF)", () => toggleEditText(), "pdf-edit-text");
   mk("💾", "Save as new PDF (Ctrl/⌘+S)", saveAsNewPdf, "pdf-save");
   mk("🖨", "Print", printPdf);
 }
@@ -238,6 +243,7 @@ async function renderAll() {
     if (p === pdfCurrentPage) cap.classList.add("pdf-page-current");
     // paint annotations for this page
     for (const a of annotations) if (a.page === p) paintAnnotation(overlay, a, cap);
+    if (editTextMode) renderTextLayerForPage(cap, p);
   }
   updatePageLabel();
   updatePageCountHint();
@@ -561,12 +567,124 @@ function updatePageCountHint() {
   if (!pdfDoc) return;
   const annCount = annotations.length;
   const sigCount = annotations.filter(a => a.type === "signature").length;
+  const editCount = textBlocks.filter(b => b.dirty).length;
   const pc = $("pagecount");
   if (pc) {
     let s = `${pdfDoc.numPages} page${pdfDoc.numPages === 1 ? "" : "s"} (PDF)`;
     if (annCount) s += ` · ${annCount} annotation${annCount === 1 ? "" : "s"}`;
+    if (editCount) s += ` · ${editCount} text edit${editCount === 1 ? "" : "s"}`;
     if (sigCount) s += ` · 🔒 signed`;
     pc.textContent = s;
+  }
+}
+
+// ---- inline text editing: extract PDF text runs, overlay editable blocks, bake into save ----
+async function ensureTextBlocks() {
+  if (textBlocksLoaded || !pdfDoc) return;
+  textBlocksLoaded = true;
+  const lib = await loadPdfjs();
+  const Util = lib.Util;
+  for (let p = 1; p <= pdfDoc.numPages; p++) {
+    const page = await pdfDoc.getPage(p);
+    const content = await page.getTextContent();
+    const viewport = page.getViewport({ scale: 1 }); // points, y-down, top-left origin — matches annotation coord space
+    const runs = [];
+    for (const it of content.items) {
+      if (!it.str || !it.str.trim()) continue;
+      const tx = Util.transform(viewport.transform, it.transform);
+      const fontSize = Math.hypot(tx[2], tx[3]) || 10;
+      runs.push({ x: tx[4], yBase: tx[5], w: it.width || fontSize * it.str.length * 0.5, fontSize, text: it.str });
+    }
+    runs.sort((a, b) => a.yBase - b.yBase || a.x - b.x);
+    const lines = [];
+    let cur = null;
+    for (const r of runs) {
+      if (cur && Math.abs(r.yBase - cur.yBase) < Math.max(2, cur.fontSize * 0.35)) {
+        const gap = r.x - cur.endX;
+        cur.text += (gap > cur.fontSize * 0.15 ? " " : "") + r.text;
+        cur.endX = r.x + r.w;
+        cur.fontSize = Math.max(cur.fontSize, r.fontSize);
+        cur.minX = Math.min(cur.minX, r.x);
+      } else {
+        if (cur) lines.push(cur);
+        cur = { yBase: r.yBase, minX: r.x, endX: r.x + r.w, fontSize: r.fontSize, text: r.text };
+      }
+    }
+    if (cur) lines.push(cur);
+    for (const ln of lines) {
+      const h = ln.fontSize * 1.25;
+      const text = ln.text.trim();
+      if (!text) continue;
+      textBlocks.push({
+        page: p,
+        x: ln.minX,
+        y: ln.yBase - ln.fontSize * 0.93,
+        w: Math.max(10, ln.endX - ln.minX) + 4,
+        h,
+        fontSize: ln.fontSize,
+        baseline: ln.yBase, // top-down baseline y (points) — used for pixel-accurate redraw on save
+        text,
+        orig: text,
+        dirty: false,
+      });
+    }
+  }
+}
+
+async function toggleEditText() {
+  if (!pdfDoc) return;
+  if (!textBlocksLoaded) await ensureTextBlocks();
+  editTextMode = !editTextMode;
+  const btn = document.querySelector(".pdf-edit-text");
+  if (btn) btn.classList.toggle("active", editTextMode);
+  if (editTextMode && !textBlocks.length) {
+    showHint("No editable text detected — this page may be scanned or image-based.");
+    setTimeout(hideHint, 3000);
+  }
+  renderTextBlocksAll();
+}
+
+function renderTextBlocksAll() {
+  document.querySelectorAll(".pdf-page-wrap").forEach(cap => {
+    const p = parseInt(cap.dataset.page, 10);
+    renderTextLayerForPage(cap, p);
+  });
+}
+
+function renderTextLayerForPage(cap, p) {
+  let layer = cap.querySelector(".pdf-text-layer");
+  if (!layer) {
+    layer = document.createElement("div");
+    layer.className = "pdf-text-layer";
+    cap.appendChild(layer);
+  }
+  layer.innerHTML = "";
+  if (!editTextMode) { layer.classList.remove("active"); return; }
+  layer.classList.add("active");
+  for (const b of textBlocks) {
+    if (b.page !== p) continue;
+    const el = document.createElement("div");
+    el.className = "pdf-text-block" + (b.dirty ? " dirty" : "");
+    el.contentEditable = "true";
+    el.spellcheck = false;
+    el.style.left = (b.x * pdfScale) + "px";
+    el.style.top = (b.y * pdfScale) + "px";
+    el.style.minWidth = (b.w * pdfScale) + "px";
+    el.style.minHeight = (b.h * pdfScale) + "px";
+    el.style.fontSize = (b.fontSize * pdfScale) + "px";
+    el.style.lineHeight = (b.h * pdfScale) + "px";
+    el.textContent = b.text;
+    el.title = "Edit text — changes are baked into the saved PDF";
+    el.addEventListener("input", () => {
+      b.text = el.textContent;
+      b.dirty = b.text !== b.orig;
+      el.classList.toggle("dirty", b.dirty);
+      updatePageCountHint();
+    });
+    el.addEventListener("pointerdown", e => e.stopPropagation());
+    el.addEventListener("click", e => e.stopPropagation());
+    el.addEventListener("dblclick", e => e.stopPropagation());
+    layer.appendChild(el);
   }
 }
 
@@ -760,6 +878,21 @@ async function saveAsNewPdf() {
     const helvOblique = await doc.embedFont(StandardFonts.HelveticaOblique);
     const pages = doc.getPages();
 
+    for (const b of textBlocks) {
+      if (!b.dirty) continue;
+      const page = pages[b.page - 1];
+      if (!page) continue;
+      const { width: pw, height: ph } = page.getSize();
+      const x = b.x;
+      const yBottom = ph - (b.y + b.h);
+      const yBaseline = ph - b.baseline;
+      // white-out the original glyphs, then redraw the edited text at the same baseline
+      page.drawRectangle({ x: x - 1, y: yBottom - 1, width: b.w + 2, height: b.h + 2, color: rgb(1, 1, 1) });
+      if (b.text && b.text.trim()) {
+        page.drawText(b.text, { x: x + 1, y: yBaseline, size: Math.max(4, b.fontSize), font: helv, color: rgb(0, 0, 0) });
+      }
+    }
+
     for (const a of annotations) {
       const page = pages[a.page - 1];
       if (!page) continue;
@@ -823,10 +956,10 @@ function saveSignedMetadata(doc, anns) {
   if (!sigAnns.length) return;
   const meta = sigAnns.map(s => `${s.data.signer || "?"}|${s.data.ts || ""}`).join("; ");
   try {
-    doc.setSubject("WordEditor: " + meta);
+    doc.setSubject("DocEditor: " + meta);
     doc.setKeywords(["word-editor", "signed", "ecdsa-sha-256"]);
-    doc.setProducer("WordEditor PDF viewer");
-    doc.setCreator("WordEditor");
+    doc.setProducer("DocEditor PDF viewer");
+    doc.setCreator("DocEditor");
   } catch {}
 }
 
@@ -1011,6 +1144,8 @@ function showContextMenu(e, cap) {
     items.push({ label: "🖋 Place signature here", fn: () => { openSignatureModal(); } });
     items.push({ label: "🏷 Place sticker here", fn: () => { openStickerPicker(); } });
     items.push({ sep: true });
+    items.push({ label: editTextMode ? "✏️ Exit text editing" : "✏️ Edit text", fn: () => toggleEditText() });
+    items.push({ sep: true });
     items.push({ label: "🔍 Zoom in", fn: () => setScale(pdfScale * 1.2) });
     items.push({ label: "🔍 Zoom out", fn: () => setScale(pdfScale / 1.2) });
     items.push({ label: "⤢ Fit width", fn: fitWidth });
@@ -1075,6 +1210,9 @@ export async function openPdf(file, opts = {}) {
   pdfDoc = await lib.getDocument({ data: pdfBytes.slice() }).promise;
   pdfCurrentPage = 1;
   annotations = [];
+  textBlocks = [];
+  textBlocksLoaded = false;
+  editTextMode = false;
   enterPdfMode();
   if (hooks.setTitle) hooks.setTitle(file.name.replace(/\.pdf$/i, ""));
   if (hooks.setStatus) hooks.setStatus("saved");
@@ -1089,6 +1227,7 @@ export function closePdf() {
   if (pdfDoc) { try { pdfDoc.destroy(); } catch {} }
   pdfDoc = null; pdfBytes = null;
   annotations = []; annSeq = 0;
+  textBlocks = []; textBlocksLoaded = false; editTextMode = false;
   pendingRender++;
   exitPdfMode();
   if (hooks.onClosed) hooks.onClosed();
