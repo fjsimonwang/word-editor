@@ -924,6 +924,7 @@ async function main() {
       try {
         if (isPdfMode()) closePdf();
         await openPdf(file, {
+          title: file.name.replace(/\.pdf$/i, ""),
           setTitle: (t) => { titleInput.value = t; },
           setStatus: (s) => setStatus(s),
           onClosed: () => { updateWordCount(); },
