@@ -59,6 +59,7 @@
     </header>
 
     <div id="toolbar"></div>
+    <div id="pdf-toolbar" class="hidden"></div>
     <div id="find-host"></div>
     <div id="banner" class="banner hidden"></div>
 
@@ -76,6 +77,7 @@
           <div id="editor" contenteditable="true" spellcheck="true"></div>
         </div>
       </div>
+      <div id="pdf-view" class="hidden"></div>
       <div id="comments-panel" class="panel panel-right hidden">
         <h3>Comments</h3>
         <ul id="comments-items"></ul>
@@ -107,7 +109,7 @@
       <label class="zoom-label"><input type="checkbox" id="spellcheck-toggle" checked /> Spellcheck</label>
     </footer>
 
-    <input id="file-input" type="file" accept=".docx,.txt,.htm,.html" class="hidden" />
+    <input id="file-input" type="file" accept=".docx,.txt,.htm,.html,.pdf" class="hidden" />
   </div>
   <script type="module" src="/js/main.js"></script>
 </body>

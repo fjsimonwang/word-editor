@@ -87,6 +87,34 @@ body {
 #toolbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; flex: none; }
 #toolbar input[type="color"] { width: 0; height: 0; padding: 0; border: none; visibility: hidden; }
 
+/* ---------- PDF viewer toolbar + canvas pages ---------- */
+#pdf-toolbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px; background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+#pdf-toolbar.hidden { display: none; }
+#pdf-toolbar button {
+  height: 28px; min-width: 28px; padding: 0 8px;
+  font-size: 15px; cursor: pointer; border: 1px solid var(--border);
+  background: var(--panel); border-radius: 4px; color: var(--ink);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+#pdf-toolbar button:hover { background: #eef1f6; border-color: #c0c4cc; }
+#pdf-toolbar .pdf-sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; flex: none; }
+#pdf-toolbar .pdf-page-label { font-size: 12px; color: var(--muted); padding: 0 6px; min-width: 100px; text-align: center; user-select: none; }
+#pdf-toolbar .pdf-zoom-label { font-size: 12px; color: var(--ink); padding: 0 6px; min-width: 44px; text-align: center; cursor: pointer; border-radius: 4px; user-select: none; }
+#pdf-toolbar .pdf-zoom-label:hover { background: #eef1f6; }
+#pdf-toolbar .pdf-close { margin-left: auto; background: #fdecea; color: #c0392b; border-color: #f5c6cb; font-size: 12px; }
+#pdf-toolbar .pdf-close:hover { background: #f8d7da; }
+#pdf-toolbar .pdf-fit { font-size: 16px; }
+#pdf-view { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px 0; }
+#pdf-view.hidden { display: none; }
+.pdf-page-wrap { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.12); border: 1px solid var(--border); }
+.pdf-page-wrap.pdf-page-current { outline: 2px solid var(--accent); outline-offset: 4px; }
+.pdf-page-wrap canvas { display: block; }
+
 .dropdown { position: relative; display: inline-flex; }
 .dropdown-menu {
   position: absolute; top: 100%; left: 0; z-index: 50;
@@ -487,7 +515,7 @@ body.view-mode #editor { cursor: default; }
 
 /* ---------- print ---------- */
 @media print {
-  #topbar, #toolbar, #statusbar, #find-host, #banner, .panel, .table-toolbar,
+  #topbar, #toolbar, #pdf-toolbar, #statusbar, #find-host, #banner, .panel, .table-toolbar,
   .img-overlay, .img-toolbar, .tooltip, .ruler-h, .ruler-v, .pg-chrome { display: none !important; }
   body, #app { height: auto; background: #fff; }
   #editor-wrap { overflow: visible; padding: 0; }
@@ -501,4 +529,9 @@ body.view-mode #editor { cursor: default; }
   #editor .page-break::after { content: none; }
   mark.find-hit { background: transparent; color: inherit; }
   #editor span.comment-ref { background: transparent; border-bottom: none; }
+  /* When viewing a PDF, print only the canvases one per sheet */
+  #pdf-view { display: block !important; padding: 0 !important; gap: 0 !important; }
+  #pdf-view.hidden { display: block !important; }
+  .pdf-page-wrap { box-shadow: none !important; border: none !important; margin: 0 !important; page-break-after: always; break-after: page; }
+  .pdf-page-wrap.pdf-page-current { outline: none !important; }
 }

@@ -39,6 +39,9 @@ docker run -d --name word-editor -p 3001:3001 -v word-editor-data:/app/data word
 - Import also resolves *style-based* numbering (Word's `List Bullet` / `List Number`)
 - Open `.txt` and `.html`; export `.docx`, `.html`, `.txt`, and PDF via the print
   pipeline (Ctrl+P → Save as PDF, honors page setup via `@page`)
+- **Open & view `.pdf` files directly** — read-only viewer with zoom, fit-width,
+  page navigation, download original, and print. pdf.js (Mozilla) is lazy-loaded
+  from CDN so it only adds weight when actually opening a PDF.
 
 **Editing**
 - Bold/italic/underline/strikethrough, sub/superscript, font family/size (pt),

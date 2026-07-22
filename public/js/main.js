@@ -16,6 +16,7 @@ import {
   Autosaver, SyncClient, createDocument, getDocument, listDocuments, deleteDocument,
   importDocxFile, putDocx, saveDocument, listVersions, getVersion, restoreVersion,
 } from "./store.js";
+import { openPdf, closePdf, isPdfMode, getPdfInfo } from "./pdf-view.js";
 
 const LS_KEY = "word-editor:current-id";
 const LS_USER = "word-editor:user";
@@ -916,10 +917,35 @@ async function main() {
   fileInput.addEventListener("change", async () => {
     const file = fileInput.files && fileInput.files[0];
     if (!file) return;
+    const name = file.name.toLowerCase();
+    // PDF: open in read-only viewer
+    if (name.endsWith(".pdf")) {
+      setStatus("saving");
+      try {
+        if (isPdfMode()) closePdf();
+        await openPdf(file, {
+          setTitle: (t) => { titleInput.value = t; },
+          setStatus: (s) => setStatus(s),
+          onClosed: () => { updateWordCount(); },
+          fitWidthDefault: true,
+        });
+        setStatus("saved");
+        const info = getPdfInfo();
+        if (info) $("pagecount").textContent = `${info.numPages} page${info.numPages === 1 ? "" : "s"} (PDF)`;
+      } catch (e) {
+        console.error(e);
+        setStatus("error");
+        alert("Could not open PDF: " + e.message);
+      } finally {
+        fileInput.value = "";
+      }
+      return;
+    }
+    // Editing formats: close PDF view if active and edit normally
+    if (isPdfMode()) closePdf();
     setStatus("saving");
     try {
       let html, pageSetup = { ...DEFAULT_PAGE_SETUP }, comments = [];
-      const name = file.name.toLowerCase();
       if (name.endsWith(".txt")) {
         html = plainTextToHtml(await file.text());
       } else if (name.endsWith(".html") || name.endsWith(".htm")) {
@@ -930,7 +956,7 @@ async function main() {
         pageSetup = res.pageSetup;
         comments = res.comments || [];
       }
-      const title = file.name.replace(/\.(docx|txt|html?)$/i, "");
+      const title = file.name.replace(/\.(docx|txt|html?|pdf)$/i, "");
       const seeded = name.endsWith(".docx")
         ? await importDocxFile(file)
         : await createDocument(title);
@@ -968,7 +994,11 @@ async function main() {
   document.addEventListener("click", (e) => {
     if (!$("file-menu-wrap").contains(e.target)) closeFileMenu();
   });
-  if ($("btn-print")) $("btn-print").addEventListener("click", () => { closeFileMenu(); window.print(); });
+  if ($("btn-print")) $("btn-print").addEventListener("click", () => {
+    closeFileMenu();
+    if (isPdfMode()) { const info = getPdfInfo(); if (info) { /* delegate to pdf-view's print via its toolbar button */ const btn = document.querySelector("#pdf-toolbar button[title='Print']"); if (btn) btn.click(); return; } }
+    window.print();
+  });
   fileMenu.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b || b.id === "btn-export") return; // keep menu open to show the Export flyout
@@ -1235,6 +1265,8 @@ async function main() {
 
   // ---- keyboard shortcuts ----
   window.addEventListener("keydown", (e) => {
+    // Esc closes the PDF viewer and returns to editing
+    if (e.key === "Escape" && isPdfMode()) { closePdf(); return; }
     const mod = e.metaKey || e.ctrlKey;
     if (!mod) return;
     const k = e.key.toLowerCase();
