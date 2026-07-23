@@ -921,27 +921,33 @@ async function saveAsNewPdf() {
     }
     saveSignedMetadata(doc, annotations);
     const saved = await doc.save({ useObjectStreams: false });
-    // cryptographic signing of the final bytes (real ECDSA-SHA-256 over the saved PDF)
+    // cryptographic signing of the page content (real ECDSA-SHA-256), embedded INTO the
+    // PDF itself as a file attachment — no separate sidecar file to keep track of.
     const hasSig = annotations.some(a => a.type === "signature");
-    let sigInfo = null;
     if (hasSig) {
       const hash = await sha256(saved);
       const sigB64 = await signBytes(saved);
       const pubB64 = await exportPubBase64();
       const sigAnn = annotations.find(a => a.type === "signature");
-      sigInfo = {
+      const sigInfo = {
         algorithm: "ECDSA-P-256-SHA-256",
         pdf_sha256: hash,
         signature_base64: sigB64,
         public_key_spki_base64: pubB64,
         signer: (sigAnn && sigAnn.data.signer) || "Anonymous",
         signed_at: (sigAnn && sigAnn.data.ts) || new Date().toISOString(),
+        note: "pdf_sha256 is the SHA-256 of this PDF's page content as of signing, before this attachment was embedded. Verify by checking the ECDSA-P-256 signature over pdf_sha256 with public_key_spki_base64.",
       };
-      const blobSig = new Blob([JSON.stringify(sigInfo, null, 2)], { type: "application/json" });
-      downloadBlob(blobSig, (hooks.title || "document") + ".sig.json");
+      await doc.attach(new TextEncoder().encode(JSON.stringify(sigInfo, null, 2)), "signature.json", {
+        mimeType: "application/json",
+        description: `Digital signature metadata (ECDSA-P-256-SHA-256) — signed by ${sigInfo.signer}`,
+        creationDate: new Date(),
+        modificationDate: new Date(),
+      });
     }
+    const finalBytes = hasSig ? await doc.save({ useObjectStreams: false }) : saved;
 
-    const blob = new Blob([saved], { type: "application/pdf" });
+    const blob = new Blob([finalBytes], { type: "application/pdf" });
     downloadBlob(blob, (hooks.title || "document") + (hasSig ? "_signed" : "_edited") + ".pdf");
     if (hooks.setStatus) hooks.setStatus("saved");
   } catch (e) {

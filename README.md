@@ -42,12 +42,13 @@ docker run -d --name word-editor -p 3001:3001 -v word-editor-data:/app/data word
 - **Open & view `.pdf` files directly** — read-only viewer with zoom (Ctrl/⌘+scroll),
   fit-width and fit-screen, page navigation, download original, and print. pdf.js
   (Mozilla) is lazy-loaded from CDN so it only adds weight when actually opening a PDF.
-- **Annotate PDFs** — add comments (sticky notes), place wet stamps (upload any
-  PNG/JPG image), and apply **real digital signatures** (ECDSA-P-256-SHA-256
-  generated with WebCrypto and stored in IndexedDB; verifiable offline via the
-  embedded public key). Right-click for the context menu. Save everything as a new
-  PDF (via pdf-lib) — signed files ship with a `<file>.sig.json` sidecar for
-  independent verification.
+- **Annotate & edit PDFs** — add comments (sticky notes), place wet stamps
+  (upload any PNG/JPG image), edit page text in place, and apply **real digital
+  signatures** (ECDSA-P-256-SHA-256 generated with WebCrypto and stored in
+  IndexedDB; verifiable offline via the embedded public key). Right-click for
+  the context menu. Save everything as a new PDF (via pdf-lib) — signed files
+  carry their signature/public-key metadata as a `signature.json` file
+  attachment embedded inside the PDF itself, not a separate sidecar.
 
 **Editing**
 - Bold/italic/underline/strikethrough, sub/superscript, font family/size (pt),
