@@ -2,6 +2,7 @@
 // table operations, format painter, sanitization, custom context menu,
 // track changes engine, comment anchors. No libraries.
 import { t } from "./i18n.js";
+import { latexToMathML, mathMLToLatex } from "./mathml.js";
 
 const FONTS = [
   "Arial", "Calibri", "Cambria", "Courier New", "Garamond", "Georgia",
@@ -95,6 +96,9 @@ export function initTooltips() {
 function exec(cmd, val) { document.execCommand(cmd, false, val); }
 function escText(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function escAttr(s) {
+  return escText(s).replace(/"/g, "&quot;");
 }
 // Scrolls only the editor's own scroll container (#editor-wrap), never the
 // page/outer iframe — native scrollIntoView walks every scrollable ancestor
@@ -226,7 +230,8 @@ function selectedBlocks(editor) {
 // HTML sanitizer (paste + loaded content)
 // ---------------------------------------------------------------
 const ALLOWED = {
-  p: [], div: [], br: [], hr: [], span: ["data-cid"], font: ["face", "size", "color"],
+  p: [], div: [], br: [], hr: [], span: ["data-cid", "data-wa-fill", "data-wa-color", "data-wa-color2", "data-wa-outline", "data-wa-shadow", "data-wa-glow", "data-wa-reflection", "title", "contenteditable"],
+  font: ["face", "size", "color"],
   b: [], strong: [], i: [], em: [], u: [], s: [], strike: [],
   ins: ["data-author", "data-ts"], del: ["data-author", "data-ts"],
   sub: [], sup: [], mark: [], code: [], kbd: [], samp: [], tt: [], pre: [],
@@ -234,8 +239,15 @@ const ALLOWED = {
   ul: [], ol: ["start"], li: [],
   table: [], thead: [], tbody: [], tfoot: [], tr: [],
   td: ["colspan", "rowspan"], th: ["colspan", "rowspan"],
-  a: ["href"], img: ["src", "width", "height", "alt"],
+  a: ["href"], img: ["src", "width", "height", "alt", "title"],
   figure: [], figcaption: [], section: [], article: [],
+  // MathML equations (see mathml.js) — kept to a small, safe subset: no
+  // annotation/annotation-xml/semantics, which are MathML's designated "HTML
+  // integration points" and the one place foreign content could smuggle
+  // active HTML back in.
+  math: ["contenteditable", "data-latex", "display"], mrow: [], mi: [], mn: [], mo: [], mtext: [],
+  mfrac: [], msqrt: [], mroot: [], msup: [], msub: [], msubsup: [],
+  munder: [], mover: [], munderover: [], mstyle: [],
 };
 const ALLOWED_STYLES = new Set([
   "color", "background-color", "font-size", "font-family", "font-weight", "font-style",
@@ -248,10 +260,11 @@ const ALLOWED_STYLES = new Set([
   // free-floating shape objects
   "position", "left", "top", "right", "bottom", "z-index",
 ]);
-const KEEP_CLASSES = ["page-break", "pb", "comment-ref", "resolved", "tc-ins", "tc-del", "wordart", "shape"];
+const KEEP_CLASSES = ["page-break", "pb", "comment-ref", "resolved", "tc-ins", "tc-del", "wordart", "shape", "eq", "smartart-preview", "smartart-missing"];
 // classes matching these prefixes are also preserved (WordArt / shape variants)
 const KEEP_CLASS_RE = /^(wa-\d+|shape-[a-z]+)$/;
-const DROP_TAGS = new Set(["script", "style", "meta", "link", "head", "title", "iframe", "object", "embed", "applet", "noscript", "svg", "math", "template", "form", "input", "button", "select", "textarea", "audio", "video"]);
+const DROP_TAGS = new Set(["script", "style", "meta", "link", "head", "title", "iframe", "object", "embed", "applet", "noscript", "svg", "template", "form", "input", "button", "select", "textarea", "audio", "video"]);
+const MATHML_NS = "http://www.w3.org/1998/Math/MathML";
 
 function sanitizeStyle(el, out) {
   const style = el.getAttribute && el.getAttribute("style");
@@ -286,7 +299,10 @@ function sanitizeNode(node, doc) {
     }
     return frag;
   }
-  const out = doc.createElement(tag);
+  // MathML elements must keep their namespace or the browser treats them as
+  // inert unknown HTML tags (no rendering at all) — createElement() always
+  // makes an HTML-namespaced node regardless of the source node's namespace.
+  const out = node.namespaceURI === MATHML_NS ? doc.createElementNS(MATHML_NS, tag) : doc.createElement(tag);
   for (const a of allowedAttrs) {
     const v = node.getAttribute(a);
     if (v == null) continue;
@@ -498,6 +514,25 @@ export function insertBlankPage(editor) { insertHtmlAtCaret(editor, BLANKPAGE_HT
 
 // WordArt: decorative text styled entirely by CSS classes (round-trips through
 // the sanitizer as span + wa-N class; keeps its text in .docx export).
+// Mirrors docx.js's LEGACY_WA_PRESETS — the real w14 text-effect data each
+// swatch represents, stamped onto newly-inserted WordArt as data-wa-*
+// attributes so export has exact values to work with instead of having to
+// guess from the wa-N class (that fallback still exists in docx.js purely
+// for documents saved before this attribute existed).
+const WA_PRESET_DATA = {
+  1: { fill: "solid", color: "2b579a", shadow: "000000" },
+  2: { fill: "gradient", color: "e0245e", color2: "f79d3c" },
+  // pale blue rather than pure white: LibreOffice (and possibly other
+  // readers) don't render w14:textOutline, so a white fill relying entirely
+  // on the outline for visibility goes invisible against a white page in
+  // those readers — see docx.js's LEGACY_WA_PRESETS comment.
+  3: { fill: "solid", color: "eaf1fb", outline: "2b579a" },
+  4: { fill: "gradient", color: "11998e", color2: "38ef7d" },
+  5: { fill: "solid", color: "6a3093", shadow: "000000" },
+  6: { fill: "gradient", color: "f7971e", color2: "ffd200" },
+  7: { fill: "solid", color: "c0392b", shadow: "000000" },
+  8: { fill: "gradient", color: "2c3e50", color2: "4ca1af" },
+};
 export function openWordArtDialog(editor) {
   saveSelection(editor);
   const initial = (window.getSelection().toString() || "").trim() || t("wordart.defaultText");
@@ -525,7 +560,64 @@ export function openWordArtDialog(editor) {
       onClick: () => {
         const text = textIn.value.trim();
         if (!text) return false;
-        insertHtmlAtCaret(editor, `<span class="wordart wa-${chosen}">${escText(text)}</span>&nbsp;`);
+        const data = WA_PRESET_DATA[chosen];
+        const dataAttrs = Object.entries(data).map(([k, v]) => ` data-wa-${k}="${v}"`).join("");
+        insertHtmlAtCaret(editor, `<span class="wordart wa-${chosen}"${dataAttrs}>${escText(text)}</span>&nbsp;`);
+      },
+    },
+  ]);
+}
+
+// Builds the <math class="eq"> HTML for one equation: a LaTeX-subset source
+// compiled to MathML (rendered natively by the browser, no library), kept
+// atomic in the editor (contenteditable="false") and carrying its own
+// data-latex so re-opening this dialog on it later doesn't need to reverse
+// MathML back into source. `insertHtmlAtCaret`/replacing outerHTML both
+// accept this string directly.
+function equationHtml(latex) {
+  const mml = latexToMathML(latex);
+  return mml.replace(/^<math /, `<math class="eq" contenteditable="false" data-latex="${escAttr(latex)}" `);
+}
+
+// Insert a new equation (existingEl omitted), or edit one already in the
+// document (existingEl = the <math class="eq"> node that was double-clicked
+// or right-clicked) — same dialog either way, since editing is just
+// re-compiling the LaTeX box and replacing the old node.
+export function openEquationDialog(editor, existingEl = null) {
+  saveSelection(editor);
+  const initialLatex = existingEl
+    ? (existingEl.getAttribute("data-latex") || mathMLToLatex(existingEl))
+    : "";
+  const srcIn = el("textarea", { rows: "3", placeholder: "\\frac{a}{b} + x^2  ·  \\sqrt{x}  ·  \\sum_{i=1}^{n} i" });
+  srcIn.value = initialLatex;
+  srcIn.className = "eq-source";
+  const preview = el("div", { class: "eq-preview" });
+  const updatePreview = () => {
+    try { preview.innerHTML = latexToMathML(srcIn.value); }
+    catch { preview.textContent = srcIn.value; }
+  };
+  srcIn.addEventListener("input", updatePreview);
+  updatePreview();
+  const hint = el("div", { class: "eq-hint" }, [t("equation.hint")]);
+  const body = el("div", {}, [
+    field(t("equation.sourceLabel"), srcIn),
+    el("div", { class: "dlg-field dlg-field-col" }, [el("span", {}, [t("equation.previewLabel")]), preview]),
+    hint,
+  ]);
+  openDialog(t(existingEl ? "equation.editTitle" : "equation.title"), body, [
+    { label: t("dlg.cancel") },
+    {
+      label: t(existingEl ? "dlg.apply" : "dlg.insert"), primary: true,
+      onClick: () => {
+        const latex = srcIn.value.trim();
+        if (!latex) return false;
+        const html = equationHtml(latex);
+        if (existingEl && existingEl.isConnected) {
+          existingEl.outerHTML = html;
+          fireInput(editor, "insertReplacementText");
+        } else {
+          insertHtmlAtCaret(editor, html + "&nbsp;");
+        }
       },
     },
   ]);
@@ -754,6 +846,19 @@ export function createFindPanel(editor, host) {
     isOpen() { return !panel.classList.contains("hidden"); },
     find(q, opts = {}) { findIn.value = q; caseCk.checked = !!opts.matchCase; regexCk.checked = !!opts.regex; panel.classList.remove("hidden"); search({ reveal: true }); return hits.length; },
     replaceAll(q, r, opts = {}) { findIn.value = q; replIn.value = r; caseCk.checked = !!opts.matchCase; regexCk.checked = !!opts.regex; search(); const n = hits.length; if (n) replaceAll(); return n; },
+    // SDK-level: highlight all matches without opening the find panel
+    highlight(q, opts = {}) { findIn.value = q; caseCk.checked = !!opts.matchCase; regexCk.checked = !!opts.regex; search({ reveal: false }); return hits.length; },
+    // Jump to the Nth match (0-based) set by highlight()/find(), scrolling it into view
+    goto(i) {
+      if (!findIn.value) return 0;
+      if (!hits.length) {
+        search({ reveal: false });
+        if (!hits.length) return 0;
+      }
+      cur = Math.max(0, Math.min(hits.length - 1, i));
+      updateCurrentHit(true);
+      return hits.length;
+    },
     clear: clearHighlights,
   };
   return api;
@@ -934,6 +1039,14 @@ export function attachContextMenu(editor, actions = {}) {
     return { label, action, ...opts };
   }
 
+  // Equations are atomic (contenteditable="false") — double-click re-opens
+  // the same LaTeX box used to insert them, pre-filled, for editing.
+  editor.addEventListener("dblclick", (e) => {
+    if (editor.contentEditable !== "true") return;
+    const eq = e.target.closest && e.target.closest("math.eq");
+    if (eq) openEquationDialog(editor, eq);
+  });
+
   editor.addEventListener("contextmenu", (e) => {
     if (editor.contentEditable !== "true") return; // view mode: browser default
     e.preventDefault();
@@ -962,6 +1075,11 @@ export function attachContextMenu(editor, actions = {}) {
     const cref = target.closest && target.closest("span.comment-ref");
     if (cref && actions.openComment) {
       items.push(item(t("ctx.viewComment"), () => actions.openComment(cref.getAttribute("data-cid"))));
+    }
+
+    const eq = target.closest && target.closest("math.eq");
+    if (eq) {
+      items.push(item(t("ctx.editEquation"), () => openEquationDialog(editor, eq)));
     }
 
     const tracked = target.closest && target.closest("ins.tc-ins, del.tc-del");

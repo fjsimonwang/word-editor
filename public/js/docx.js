@@ -1,3 +1,5 @@
+import { latexToMathML, mathMLToLatex, mmlToOmml, ommlToMathML } from "./mathml.js";
+
 // docx.js — dependency-free .docx read/write.
 // Uses the browser's native CompressionStream/DecompressionStream ("deflate-raw")
 // for ZIP inflate/deflate, plus manual ZIP container parsing and OOXML (Word ML)
@@ -15,6 +17,10 @@ const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const A = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 const WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+const M = "http://schemas.openxmlformats.org/officeDocument/2006/math"; // equations (m:oMath)
+const MC = "http://schemas.openxmlformats.org/markup-compatibility/2006"; // mc:AlternateContent (SmartArt/shape fallbacks, w14 opt-in)
+const W14 = "http://schemas.microsoft.com/office/word/2010/wordml"; // real WordArt/text-effect run properties
+const VML = "urn:schemas-microsoft-com:vml"; // legacy fallback picture markup inside mc:Fallback
 
 export function supportsDocx() {
   return typeof DecompressionStream !== "undefined" && typeof CompressionStream !== "undefined";
@@ -364,18 +370,27 @@ function resolveTarget(target) {
   return out.join("/");
 }
 
+// Resolves an r:id to raster image bytes via the part's relationships,
+// returning a data: URL, or null if missing/unsupported (emf/wmf etc. —
+// nothing here can rasterize vector metafiles without a real renderer).
+function resolveEmbeddedImageDataUrl(relId, ctx) {
+  const rel = relId && ctx.rels.get(relId);
+  if (!rel) return null;
+  const partName = resolveTarget(rel.target);
+  const data = ctx.files.get(partName);
+  if (!data) return null;
+  const ext = (partName.split(".").pop() || "").toLowerCase();
+  const mime = IMG_MIME[ext];
+  if (!mime) return null;
+  return bytesToDataUrl(data, mime);
+}
+
 function imageFromDrawing(node, ctx) {
   const blip = findDesc(node, "blip");
   if (!blip) return "";
   const embed = blip.getAttributeNS(R, "embed") || blip.getAttribute("r:embed");
-  const rel = embed && ctx.rels.get(embed);
-  if (!rel) return "";
-  const partName = resolveTarget(rel.target);
-  const data = ctx.files.get(partName);
-  if (!data) return "";
-  const ext = (partName.split(".").pop() || "").toLowerCase();
-  const mime = IMG_MIME[ext];
-  if (!mime) return ""; // emf/wmf etc. — browser can't render
+  const src = resolveEmbeddedImageDataUrl(embed, ctx);
+  if (!src) return "";
   let style = "";
   const extent = findDesc(node, "extent");
   if (extent) {
@@ -385,7 +400,118 @@ function imageFromDrawing(node, ctx) {
       style = ` width="${Math.round(cx / EMU_PER_PX)}" height="${Math.round(cy / EMU_PER_PX)}"`;
     }
   }
-  return `<img src="${bytesToDataUrl(data, mime)}"${style} alt="">`;
+  return `<img src="${src}"${style} alt="">`;
+}
+
+// SmartArt (and some other "future" DrawingML content like modern shapes)
+// is inserted as <mc:AlternateContent>: an <mc:Choice> carrying the real
+// diagram/shape data we don't render, plus an <mc:Fallback> Word also embeds
+// for older-version compatibility, which is a plain raster preview of the
+// same content (VML <v:imagedata> or a plain drawingML picture). We don't
+// implement SmartArt's layout engine (this is a read-only-preview feature,
+// not editable-SmartArt) — so surface that fallback picture as a normal,
+// clearly-labeled read-only image instead of silently dropping the content.
+function alternateContentToHtml(node, ctx) {
+  const choice = child(node, MC, "Choice");
+  const fallback = child(node, MC, "Fallback");
+  const isDiagram = choice && findDesc(choice, "relIds") != null; // dgm:relIds marks a SmartArt diagram
+  if (!fallback) return "";
+  let src = null;
+  const blip = findDesc(fallback, "blip");
+  if (blip) {
+    const embed = blip.getAttributeNS(R, "embed") || blip.getAttribute("r:embed");
+    src = resolveEmbeddedImageDataUrl(embed, ctx);
+  }
+  if (!src) {
+    const imagedata = findDesc(fallback, "imagedata");
+    if (imagedata) {
+      const rid = imagedata.getAttributeNS(R, "id") || imagedata.getAttribute("r:id") || imagedata.getAttribute("o:relid");
+      src = resolveEmbeddedImageDataUrl(rid, ctx);
+    }
+  }
+  // Kept in English, like every other user-facing string in this module
+  // (see the throw new Error(...) messages above) — docx.js is deliberately
+  // i18n-agnostic; translation is the presentation layer's job (main.js /
+  // editor.js), same as how import/export errors get wrapped in t(...) one
+  // layer up. This particular text is baked into the document's own saved
+  // HTML content rather than shown in a dialog, so there's no equivalent
+  // wrapping point for it — an acceptable rough edge for a read-only,
+  // rarely-hit fallback path.
+  if (src) {
+    const title = isDiagram ? "SmartArt diagram — read-only preview, not editable here" : "Compatibility preview image; the original object was not fully preserved";
+    return `<img src="${src}" class="${isDiagram ? "smartart-preview" : ""}" alt="${escHtml(title)}" title="${escHtml(title)}">`;
+  }
+  if (isDiagram) {
+    return `<span class="smartart-missing" contenteditable="false" title="This document contains a SmartArt diagram, but no usable preview image was found">🗂 [SmartArt diagram — no preview available]</span>`;
+  }
+  return ""; // no fallback picture and not a diagram: same as before, drop silently
+}
+
+// Real WordArt in current-generation Word/OOXML is just a run with Office
+// 2010+ "text effect" properties (w14:*) — the Home tab's Text Effects
+// gallery, not the classic floating-shape WordArt object. That's the honest,
+// buildable target here: no floating drawing/VML shape machinery, just
+// genuinely valid, Word-recognized run-level effects. Detects w14:textFill
+// (gradient fill), w14:textOutline, and w14:shadow/w14:glow/w14:reflection on
+// a run's rPr, returning data-wa-* attributes + a matching inline style that
+// approximates the same look with plain CSS — or null if the run has none.
+function w14Color(fillEl) {
+  if (!fillEl) return null;
+  const solid = child(fillEl, W14, "solidFill") || fillEl;
+  const srgb = findDesc(solid, "srgbClr");
+  return srgb ? (srgb.getAttributeNS(W14, "val") || srgb.getAttribute("w14:val")) : null;
+}
+function wordArtFromRpr(rPr, plainColor) {
+  if (!rPr) return null;
+  const outline = child(rPr, W14, "textOutline");
+  const shadow = child(rPr, W14, "shadow");
+  const glow = child(rPr, W14, "glow");
+  const reflection = child(rPr, W14, "reflection");
+  const textFill = child(rPr, W14, "textFill");
+  const gradFill = textFill && child(textFill, W14, "gradFill");
+  if (!outline && !shadow && !glow && !reflection && !gradFill) return null;
+
+  const data = {};
+  const styles = ["font-weight:800"];
+  if (gradFill) {
+    const gsLst = child(gradFill, W14, "gsLst");
+    const stops = (gsLst ? [...gsLst.children] : [])
+      .map((gs) => ({ pos: parseInt(gs.getAttributeNS(W14, "pos") || gs.getAttribute("w14:pos") || "0", 10), color: w14Color(gs) }))
+      .filter((s) => s.color)
+      .sort((a, b) => a.pos - b.pos);
+    const c1 = stops[0] ? "#" + stops[0].color : (plainColor ? "#" + plainColor : "#2b579a");
+    const c2 = stops[stops.length - 1] ? "#" + stops[stops.length - 1].color : c1;
+    data.fill = "gradient"; data.color = c1.replace("#", ""); data.color2 = c2.replace("#", "");
+    styles.push(`background:linear-gradient(90deg,${c1},${c2})`, "-webkit-background-clip:text", "background-clip:text", "-webkit-text-fill-color:transparent", `color:${c1}`);
+  } else {
+    const c = plainColor ? "#" + plainColor : "#2b579a";
+    data.fill = "solid"; data.color = c.replace("#", "");
+    styles.push(`color:${c}`);
+  }
+  if (outline) {
+    const oc = w14Color(outline) || "ffffff";
+    const wEmu = parseInt(outline.getAttributeNS(W14, "w") || outline.getAttribute("w14:w") || "12700", 10);
+    const px = Math.max(1, Math.round(wEmu / 12700));
+    data.outline = oc;
+    styles.push(`-webkit-text-stroke:${px}px #${oc}`);
+  }
+  if (shadow) {
+    const sc = w14Color(shadow) || "000000";
+    data.shadow = sc;
+    styles.push(`text-shadow:2px 2px 2px #${sc}`);
+  }
+  if (glow) {
+    const gc = w14Color(glow) || "ffd700";
+    data.glow = gc;
+    styles.push(`text-shadow:0 0 6px #${gc},0 0 10px #${gc}`);
+  }
+  if (reflection) {
+    data.reflection = "1";
+    // plain CSS can't produce a real mirrored reflection on inline text;
+    // a soft under-shadow is the closest honest approximation.
+    styles.push("filter:drop-shadow(0 4px 3px rgba(0,0,0,.25))");
+  }
+  return { data, style: styles.join(";") };
 }
 
 function runToHtml(r, ctx) {
@@ -394,7 +520,7 @@ function runToHtml(r, ctx) {
   let pageBreak = false;
   const segs = [];
   for (const c of r.children) {
-    if (c.namespaceURI !== W && c.localName !== "drawing") continue;
+    if (c.namespaceURI !== W && c.localName !== "drawing" && c.localName !== "AlternateContent") continue;
     if (c.localName === "t") segs.push({ t: c.textContent });
     else if (c.localName === "delText") segs.push({ t: c.textContent });
     else if (c.localName === "tab") segs.push({ t: "\t" });
@@ -404,6 +530,7 @@ function runToHtml(r, ctx) {
       else segs.push({ br: true });
     }
     else if (c.localName === "drawing") segs.push({ raw: imageFromDrawing(c, ctx) });
+    else if (c.localName === "AlternateContent") segs.push({ raw: alternateContentToHtml(c, ctx) });
     else if (c.localName === "noBreakHyphen") segs.push({ t: "‑" });
   }
   let open = "", close = "";
@@ -421,9 +548,12 @@ function runToHtml(r, ctx) {
     }
     const styles = [];
     const color = child(rPr, W, "color");
-    if (color) {
-      const v = attr(color, "val");
-      if (v && v !== "auto") styles.push("color:#" + v.toLowerCase());
+    const colorVal = color ? attr(color, "val") : null;
+    const wordart = wordArtFromRpr(rPr, colorVal && colorVal !== "auto" ? colorVal.toLowerCase() : null);
+    if (wordart) {
+      styles.push(wordart.style);
+    } else if (color && colorVal && colorVal !== "auto") {
+      styles.push("color:#" + colorVal.toLowerCase());
     }
     const hl = child(rPr, W, "highlight");
     if (hl) {
@@ -446,7 +576,15 @@ function runToHtml(r, ctx) {
       const f = rFonts.getAttributeNS(W, "ascii") ?? rFonts.getAttribute("w:ascii");
       if (f) styles.push("font-family:" + f);
     }
-    if (styles.length) { open += `<span style="${styles.join(";")}">`; close = "</span>" + close; }
+    if (styles.length) {
+      if (wordart) {
+        const dataAttrs = Object.entries(wordart.data).map(([k, v]) => ` data-wa-${k}="${escHtml(v)}"`).join("");
+        open += `<span class="wordart"${dataAttrs} style="${styles.join(";")}">`;
+      } else {
+        open += `<span style="${styles.join(";")}">`;
+      }
+      close = "</span>" + close;
+    }
   }
   for (const seg of segs) {
     if (seg.raw !== undefined) { out += seg.raw; continue; }
@@ -462,6 +600,12 @@ function inlineToHtml(parent, ctx) {
   let html = "";
   let pageBreak = false;
   for (const node of parent.children) {
+    if (node.namespaceURI === M && (node.localName === "oMath" || node.localName === "oMathPara")) {
+      // equation: convert OMML -> MathML and embed as an atomic, clickable
+      // <math> island (browsers render MathML natively — no library needed).
+      html += `<math class="eq" contenteditable="false">${ommlToMathML(node).replace(/^<math[^>]*>|<\/math>$/g, "")}</math>`;
+      continue;
+    }
     if (node.namespaceURI !== W) continue;
     if (node.localName === "r") {
       const r = runToHtml(node, ctx);
@@ -954,6 +1098,37 @@ function spanProps(el, props) {
   return np;
 }
 
+// The 8 built-in "insert WordArt" swatches (public/css/app.css .wa-1..wa-8) —
+// used only as an export fallback for spans saved before this feature had
+// data-wa-* attributes (i.e. existing documents' stored HTML state). Any
+// WordArt inserted or re-saved from now on carries data-wa-* directly (set at
+// insert time, or read off a real imported Word text effect), which export
+// prefers whenever present — this table only prevents old content from
+// silently exporting as plain text.
+const LEGACY_WA_PRESETS = {
+  "wa-1": { fill: "solid", color: "2b579a", shadow: "000000" },
+  "wa-2": { fill: "gradient", color: "e0245e", color2: "f79d3c" },
+  // pale blue, not pure white: some readers (LibreOffice included) don't
+  // render w14:textOutline at all, and white-on-white with no outline is
+  // invisible — verified against LibreOffice's own PDF export.
+  "wa-3": { fill: "solid", color: "eaf1fb", outline: "2b579a" },
+  "wa-4": { fill: "gradient", color: "11998e", color2: "38ef7d" },
+  "wa-5": { fill: "solid", color: "6a3093", shadow: "000000" },
+  "wa-6": { fill: "gradient", color: "f7971e", color2: "ffd200" },
+  "wa-7": { fill: "solid", color: "c0392b", shadow: "000000" },
+  "wa-8": { fill: "gradient", color: "2c3e50", color2: "4ca1af" },
+};
+function wordArtPropsFromEl(el) {
+  const data = {};
+  for (const attrName of ["fill", "color", "color2", "outline", "shadow", "glow", "reflection"]) {
+    const v = el.getAttribute("data-wa-" + attrName);
+    if (v) data[attrName] = v;
+  }
+  if (data.fill) return data;
+  for (const cls of el.classList) if (LEGACY_WA_PRESETS[cls]) return LEGACY_WA_PRESETS[cls];
+  return { fill: "solid", color: "2b579a" }; // wordart class with no recognizable preset/data — still export as *something* real rather than nothing
+}
+
 function collectRuns(node, props, runs) {
   for (const kid of node.childNodes) {
     if (kid.nodeType === 3) {
@@ -986,6 +1161,7 @@ function collectRuns(node, props, runs) {
     else if (tag === "code" || tag === "kbd" || tag === "samp" || tag === "tt") np.font = "Courier New";
     else if (tag === "br") { runs.push({ ...props, br: true, pb: el.classList.contains("pb") }); continue; }
     else if (tag === "img") { runs.push({ ...props, img: el }); continue; }
+    else if (tag === "math") { runs.push({ ...props, math: el }); continue; }
     else if (tag === "a") {
       const href = el.getAttribute("href");
       if (href && /^(https?:|mailto:)/i.test(href)) np.link = href;
@@ -994,6 +1170,9 @@ function collectRuns(node, props, runs) {
       if (el.classList && el.classList.contains("comment-ref")) {
         const cid = el.getAttribute("data-cid");
         if (cid) np.cmt = cid;
+      }
+      if (el.classList && el.classList.contains("wordart")) {
+        np.wordart = wordArtPropsFromEl(el);
       }
       const face = el.getAttribute("face");
       if (face) np.font = face;
@@ -1007,14 +1186,55 @@ function collectRuns(node, props, runs) {
   }
 }
 
+// Real w14 text-effect XML for a WordArt run (see wordArtFromRpr's import-side
+// comment for why this is the honest scope: run-level Office 2010+ text
+// effects, the same thing Word's own Text Effects gallery produces).
+function wordArtXml(wa) {
+  const parts = [];
+  if (wa.fill === "gradient" && wa.color && wa.color2) {
+    parts.push(
+      `<w14:textFill><w14:gradFill><w14:gsLst>` +
+      `<w14:gs w14:pos="0"><w14:srgbClr w14:val="${escXml(wa.color)}"/></w14:gs>` +
+      `<w14:gs w14:pos="100000"><w14:srgbClr w14:val="${escXml(wa.color2)}"/></w14:gs>` +
+      `</w14:gsLst><w14:lin w14:ang="0" w14:scaled="0"/></w14:gradFill></w14:textFill>`
+    );
+  }
+  if (wa.outline) {
+    parts.push(
+      `<w14:textOutline w14:w="12700" w14:cap="rnd" w14:cmpd="sng" w14:algn="ctr">` +
+      `<w14:solidFill><w14:srgbClr w14:val="${escXml(wa.outline)}"/></w14:solidFill>` +
+      `<w14:prstDash w14:val="solid"/><w14:round/></w14:textOutline>`
+    );
+  }
+  if (wa.shadow) {
+    parts.push(
+      `<w14:shadow w14:blurRad="12700" w14:dist="38100" w14:dir="2700000" w14:sx="100000" w14:sy="100000" ` +
+      `w14:kx="0" w14:ky="0" w14:algn="tl" w14:rotWithShape="0">` +
+      `<w14:srgbClr w14:val="${escXml(wa.shadow)}"><w14:alpha w14:val="60000"/></w14:srgbClr></w14:shadow>`
+    );
+  }
+  if (wa.glow) {
+    parts.push(`<w14:glow w14:rad="63500"><w14:srgbClr w14:val="${escXml(wa.glow)}"><w14:alpha w14:val="60000"/></w14:srgbClr></w14:glow>`);
+  }
+  if (wa.reflection) {
+    parts.push(
+      `<w14:reflection w14:blurRad="6350" w14:stA="50000" w14:stPos="0" w14:endA="0" w14:endPos="35000" ` +
+      `w14:dist="0" w14:dir="5400000" w14:fadeDir="5400000" w14:sx="100000" w14:sy="-100000" w14:kx="0" w14:ky="0" w14:algn="bl"/>`
+    );
+  }
+  return parts.join("");
+}
+
 function runPropsXml(run, opts = {}) {
   const rPr = [];
   if (opts.hyperlink) rPr.push(`<w:rStyle w:val="Hyperlink"/>`);
   if (run.font) rPr.push(`<w:rFonts w:ascii="${escXml(run.font)}" w:hAnsi="${escXml(run.font)}"/>`);
-  if (run.b) rPr.push(`<w:b/>`);
+  if (run.b || run.wordart) rPr.push(`<w:b/>`);
   if (run.i) rPr.push(`<w:i/>`);
   if (run.s) rPr.push(`<w:strike/>`);
-  if (run.color) rPr.push(`<w:color w:val="${escXml(run.color)}"/>`);
+  const effectiveColor = run.color || (run.wordart && run.wordart.color);
+  if (effectiveColor) rPr.push(`<w:color w:val="${escXml(effectiveColor)}"/>`);
+  if (run.wordart) rPr.push(wordArtXml(run.wordart));
   if (run.sz) rPr.push(`<w:sz w:val="${run.sz}"/><w:szCs w:val="${run.sz}"/>`);
   if (run.highlight) {
     const named = HEX_TO_HIGHLIGHT[run.highlight.toLowerCase()];
@@ -1047,6 +1267,10 @@ function imageRunXml(run, ctx) {
 
 function runToXml(run, ctx, opts = {}) {
   if (run.img) return imageRunXml(run, ctx);
+  // m:oMath is a paragraph-level content item (a sibling of w:r), never a
+  // run — this is emitted "in place" among the other runs' XML, which is
+  // still correct since runsToXml's whole output just becomes <w:p> children.
+  if (run.math) return `<m:oMath>${mmlToOmml(run.math)}</m:oMath>`;
   if (run.br) return run.pb ? `<w:r><w:br w:type="page"/></w:r>` : `<w:r><w:br/></w:r>`;
   // deleted runs must use w:delText instead of w:t
   const tTag = run.del ? "w:delText" : "w:t";
@@ -1568,7 +1792,8 @@ function domToDocumentXml(container, ctx, pageSetup) {
   }
   if (!body) body = `<w:p/>`;
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
-    `<w:document xmlns:w="${W}" xmlns:r="${R}" xmlns:wp="${WP}" xmlns:a="${A}" xmlns:pic="${PIC}">` +
+    `<w:document xmlns:w="${W}" xmlns:r="${R}" xmlns:wp="${WP}" xmlns:a="${A}" xmlns:pic="${PIC}" ` +
+    `xmlns:m="${M}" xmlns:mc="${MC}" xmlns:w14="${W14}" mc:Ignorable="w14">` +
     `<w:body>${body}${sectPrXml(pageSetup, ctx)}</w:body></w:document>`;
 }
 

@@ -5,7 +5,7 @@ import {
   sanitizeHtml, insertHtmlAtCaret, insertTextAtCaret, openPageSetupDialog,
   openDialog, countWords, saveSelection, restoreSelection,
   insertImage, openTableDialog, openLinkDialog, openSymbolDialog,
-  openWordArtDialog, openShapeDialog, insertPageBreak, insertBlankPage,
+  openWordArtDialog, openShapeDialog, openEquationDialog, insertPageBreak, insertBlankPage,
   scrollElementIntoEditorView,
 } from "./editor.js";
 import { History } from "./history.js";
@@ -1151,6 +1151,7 @@ async function main() {
     else if (a === "symbol") openSymbolDialog(editor);
     else if (a === "wordart") openWordArtDialog(editor);
     else if (a === "shape") openShapeDialog(editor);
+    else if (a === "equation") openEquationDialog(editor);
     else if (a === "header") openHeaderFooterDialog("header");
     else if (a === "footer") openHeaderFooterDialog("footer");
     else if (a === "pagenum") openPageNumberDialog();
@@ -1422,6 +1423,9 @@ async function main() {
           break;
         }
         case "find": reply({ matches: findPanel.find((m.args && m.args.query) || "", m.args || {}) }); break;
+        case "highlight": reply({ matches: findPanel.highlight(String((m.args && m.args.query) || ""), m.args || {}) }); break;
+        case "gotoHighlight": reply({ matches: findPanel.goto(parseInt(m.args && m.args.index, 10) || 0) }); break;
+        case "clearHighlight": findPanel.clear(); reply({ ok: true }); break;
         case "replaceAll": reply({ replaced: findPanel.replaceAll((m.args && m.args.query) || "", (m.args && m.args.replacement) || "", m.args || {}) }); break;
         case "focus": editor.focus(); reply({ ok: true }); break;
         case "setAuthToken": setAuthToken((m.args && m.args.token) || null); reply({ ok: true }); break;

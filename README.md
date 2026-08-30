@@ -47,6 +47,13 @@ docker compose --profile multi-instance up -d --build
   **hyperlinks**, page size/orientation/margins (sectPr), document properties (core.xml)
 - Exported packages are valid OOXML (validated against python-docx / strict XML parsing)
 - Import also resolves *style-based* numbering (Word's `List Bullet` / `List Number`)
+- **Math equations** — a compact LaTeX-subset editor (fractions, roots, sub/superscripts,
+  Σ/Π/∫ with limits, greek letters) compiled to MathML for native browser rendering
+  (no rendering library), and converted to/from real `<m:oMath>` OOXML on export/import
+- **Real WordArt** — Office 2010+ text-effect run properties (gradient fill, outline,
+  shadow, glow), not a CSS trick: opens correctly in actual Word, not just this editor
+- **SmartArt** — imported as a read-only preview image (the compatibility raster Word
+  itself embeds for older readers); not an editable diagram — see *Production notes*
 - Open `.txt` and `.html`; export `.docx`, `.html`, `.txt`, and PDF via the print
   pipeline (Ctrl+P → Save as PDF, honors page setup via `@page`)
 - **Open & view `.pdf` files directly** — read-only viewer with zoom (Ctrl/⌘+scroll),
@@ -182,22 +189,27 @@ configured bucket): `<id>.json` (state + pageSetup + rev + tenantId/contractId),
 | Area | Status |
 |---|---|
 | .docx read/write | ✅ solid subset (see above); complex Word features degrade gracefully |
-| .doc, .odt, .rtf, .dotx | ❌ not supported (see *Production notes*) |
+| .doc, .dot | ✅ via server-side LibreOffice conversion — see [server/docConvert.js](server/docConvert.js) |
+| .odt, .rtf, .dotx | ❌ not supported (see *Production notes*) |
 | PDF/HTML/TXT export | ✅ (PDF via browser print) · EPUB ❌ |
 | Text formatting, styles, lists | ✅ |
 | Find & replace (regex) | ✅ · formatting-aware search ❌ |
 | Spellcheck | ✅ browser-native · grammar/autocorrect ❌ |
-| Page setup, page breaks | ✅ · columns, headers/footers, footnotes, TOC, watermarks ❌ |
+| Page setup, page breaks, headers/footers/page numbers | ✅ real OOXML round-trip · columns, footnotes, TOC, watermarks ❌ |
 | Tables (merge/split/shading) | ✅ · table formulas ❌ |
 | Images | ✅ inline · crop/wrap/anchored positioning ❌ |
-| Shapes, WordArt, SmartArt, charts, equations | ❌ |
+| Math equations | ✅ real `<m:oMath>` round-trip via a LaTeX-subset editor + MathML (browser-native rendering, no library) — see [public/js/mathml.js](public/js/mathml.js) |
+| WordArt | ✅ real Office 2010+ text-effect run properties (`w14:textFill`/`textOutline`/`shadow`/`glow`) — not the classic floating-shape WordArt object, which no current mainstream Word version's default UI produces either |
+| SmartArt | ⚠️ read-only preview only (the compatibility raster Word embeds for older readers) — no editable diagram-layout engine |
+| Shapes, charts | ❌ (shapes are a CSS-only in-app visual, not exported to real OOXML) |
 | Hyperlinks, symbols | ✅ · bookmarks/cross-references ❌ |
 | Presence + live sync | ✅ (rev-based last-writer-wins + conflict UI) |
 | Character-level co-editing (OT/CRDT) | ❌ — see below |
-| Track changes, comments | ❌ (tracked inserts are imported as plain text) |
+| Track changes, comments | ✅ (insert/delete tracking, accept/reject, threaded comments) |
 | Version history & restore | ✅ |
 | Embedding, JS SDK, events | ✅ |
-| Theming/multi-language UI | ❌ (CSS variables make theming straightforward) |
+| Theming | ✅ CSS variables make this straightforward |
+| UI language | ✅ English/Chinese, `data-i18n` + `public/js/i18n.js` |
 | Auth, webhooks, autosave, locking | ✅ token auth, save webhook, autosave, rev-guard |
 | Docker deployment | ✅ |
 
@@ -209,8 +221,9 @@ requirements are **not honestly achievable in a from-scratch stack** of this siz
 regardless of effort:
 
 1. **Bit-perfect MS Word fidelity across arbitrary documents** (embedded objects,
-   SmartArt, equations, macros, .doc/.odt/.rtf). Word's format surface is
-   enormous; even mature open-source suites approximate it. If you need
+   editable SmartArt, macros, .odt/.rtf — `.doc` itself is supported, see below).
+   Word's format surface is enormous; even mature open-source suites approximate
+   it. If you need
    open-anything/round-trip-anything guarantees, put this UI aside and deploy
    **OnlyOffice Document Server** or **Collabora Online** (both open-source,
    Docker-ready) behind your app — that is what commercial products do.

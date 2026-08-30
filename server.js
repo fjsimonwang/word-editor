@@ -32,6 +32,10 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN || "";
 const TOKEN_SECRET = process.env.TOKEN_SECRET || AUTH_TOKEN;
 const WEBHOOK = process.env.SAVE_WEBHOOK_URL || "";
 const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || "").replace(/\/$/, "");
+// Cross-origin embedding: when EMBED_ALLOW_ORIGINS is set (comma-separated list, or "*"),
+// the SAMEORIGIN frame lock is replaced with a frame-ancestors CSP so a host app
+// (e.g. the CLM platform) can embed the editor in an <iframe>.
+const EMBED_ALLOW_ORIGINS = (process.env.EMBED_ALLOW_ORIGINS || "").trim();
 const WEBHOOK_INLINE_MAX = 4 * 1024 * 1024; // inline docx bytes in the webhook up to this size; larger docs are sent as a download URL only
 const MAX_BODY = 64 * 1024 * 1024; // 64 MB
 const MAX_VERSIONS = 30;
@@ -97,8 +101,14 @@ const MIME = {
 
 const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "SAMEORIGIN",
   "Referrer-Policy": "no-referrer",
+  ...(EMBED_ALLOW_ORIGINS
+    ? {
+        "Content-Security-Policy":
+          "frame-ancestors 'self' " +
+          (EMBED_ALLOW_ORIGINS === "*" ? "*" : EMBED_ALLOW_ORIGINS.split(",").map((o) => o.trim()).join(" ")),
+      }
+    : { "X-Frame-Options": "SAMEORIGIN" }),
 };
 
 function send(res, code, body, headers = {}) {

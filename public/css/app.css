@@ -324,7 +324,7 @@ body.pdf-dragging .pdf-ann * { pointer-events: none; }
 .wordart { font-weight: 800; font-family: "Segoe UI", Arial, sans-serif; }
 .wordart.wa-1 { color: #2b579a; text-shadow: 1px 1px 0 #b7c6e0, 2px 2px 2px rgba(0,0,0,.25); }
 .wordart.wa-2 { background: linear-gradient(90deg,#e0245e,#f79d3c); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #e0245e; }
-.wordart.wa-3 { color: #fff; -webkit-text-stroke: 1px #2b579a; text-shadow: 2px 2px 0 #2b579a; }
+.wordart.wa-3 { color: #eaf1fb; -webkit-text-stroke: 1px #2b579a; text-shadow: 2px 2px 0 #2b579a; }
 .wordart.wa-4 { background: linear-gradient(90deg,#11998e,#38ef7d); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #11998e; }
 .wordart.wa-5 { color: #6a3093; text-shadow: 0 1px 0 #c9a0dc, 0 2px 6px rgba(106,48,147,.5); letter-spacing: .5px; }
 .wordart.wa-6 { background: linear-gradient(90deg,#f7971e,#ffd200); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #f7971e; }
@@ -334,6 +334,20 @@ body.pdf-dragging .pdf-ann * { pointer-events: none; }
 .wa-swatch { font-size: 15px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; }
 .wa-swatch.sel { border-color: var(--accent); box-shadow: 0 0 0 2px #cfe0f7; }
 .dlg-field-col { flex-direction: column; align-items: flex-start; gap: 6px; }
+
+/* ---------- equations ---------- */
+#editor math.eq { cursor: pointer; border-radius: 3px; padding: 0 2px; }
+#editor math.eq:hover { outline: 1px dashed var(--accent); background: #f0f5fc; }
+.eq-source { width: 100%; font-family: "Courier New", monospace; font-size: 13px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; resize: vertical; }
+.eq-preview { width: 100%; min-height: 48px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; background: #fafbfc; font-size: 16px; overflow-x: auto; }
+.eq-hint { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ---------- SmartArt (read-only preview — see docx.js's alternateContentToHtml) ---------- */
+#editor img.smartart-preview { border: 1px dashed #b0b7c3; border-radius: 4px; cursor: not-allowed; }
+#editor .smartart-missing {
+  display: inline-block; padding: 10px 16px; border: 1px dashed #b0b7c3; border-radius: 6px;
+  background: #f5f6f8; color: var(--muted); font-size: 13px; cursor: not-allowed; user-select: none;
+}
 
 /* ---------- shapes in the document ---------- */
 #editor .shape { user-select: none; }
